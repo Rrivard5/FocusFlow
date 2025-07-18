@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import re
 import PyPDF2
 import docx
@@ -26,7 +26,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced CSS with compact header and better readability
+# Enhanced CSS with color coding and 30-minute increments
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -41,33 +41,20 @@ st.markdown("""
     .main-container {
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px);
-        border-radius: 24px;
+        border-radius: 20px;
         padding: 1.5rem;
         margin: 0.5rem;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    .compact-hero {
+    .app-title {
         text-align: center;
-        padding: 1.5rem;
-        background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
-        border-radius: 16px;
-        margin-bottom: 1.5rem;
-        color: #ffffff;
-    }
-    
-    .compact-hero h1 {
-        font-size: 2.2rem;
+        font-size: 2rem;
         font-weight: 700;
-        margin: 0;
-        text-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }
-    
-    .compact-hero p {
-        font-size: 1rem;
-        margin: 0.5rem 0 0 0;
-        opacity: 0.9;
+        color: #6c5ce7;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
     .setup-card {
@@ -92,7 +79,6 @@ st.markdown("""
         font-weight: 600;
         margin-right: 12px;
         font-size: 1rem;
-        box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
     }
     
     .course-card {
@@ -114,11 +100,26 @@ st.markdown("""
     .course-name {
         font-size: 0.95rem;
         color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 0.75rem;
+    }
+    
+    .class-schedule {
+        background: rgba(108, 92, 231, 0.1);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-left: 3px solid #6c5ce7;
+    }
+    
+    .class-schedule-item {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+        margin: 0.25rem 0;
     }
     
     .intramural-card {
-        background: rgba(0, 184, 148, 0.1);
-        border: 1px solid rgba(0, 184, 148, 0.3);
+        background: rgba(230, 126, 34, 0.1);
+        border: 1px solid rgba(230, 126, 34, 0.3);
         border-radius: 12px;
         padding: 1.25rem;
         margin: 1rem 0;
@@ -126,17 +127,18 @@ st.markdown("""
     }
     
     .intramural-card h4 {
-        color: #00b894;
+        color: #e67e22;
         margin-bottom: 1rem;
         font-size: 1.1rem;
     }
     
     .activity-item {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(230, 126, 34, 0.15);
         border-radius: 8px;
         padding: 0.75rem;
         margin: 0.5rem 0;
-        border-left: 3px solid #00b894;
+        border-left: 3px solid #e67e22;
+        color: #ffffff;
     }
     
     .wellness-info {
@@ -158,95 +160,6 @@ st.markdown("""
         color: rgba(255, 255, 255, 0.9);
         line-height: 1.5;
         margin-bottom: 0.5rem;
-    }
-    
-    .schedule-table {
-        width: 100%;
-        border-collapse: collapse;
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        overflow: hidden;
-        margin: 1.5rem 0;
-        font-size: 0.9rem;
-    }
-    
-    .schedule-table th {
-        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
-        color: white;
-        padding: 0.75rem 0.5rem;
-        text-align: center;
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-    
-    .schedule-table td {
-        padding: 0.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        vertical-align: top;
-        background: rgba(255, 255, 255, 0.05);
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 0.85rem;
-        line-height: 1.3;
-    }
-    
-    .time-slot {
-        font-weight: 600;
-        color: #6c5ce7;
-        min-width: 70px;
-        text-align: center;
-        background: rgba(108, 92, 231, 0.1);
-        border-right: 2px solid rgba(108, 92, 231, 0.3);
-        font-size: 0.8rem;
-    }
-    
-    .study-block {
-        background: rgba(108, 92, 231, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem;
-        margin: 0.1rem 0;
-        font-weight: 500;
-        color: white;
-        text-align: center;
-    }
-    
-    .meal-block {
-        background: rgba(253, 203, 110, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem;
-        margin: 0.1rem 0;
-        font-weight: 500;
-        color: white;
-        text-align: center;
-    }
-    
-    .free-block {
-        background: rgba(0, 184, 148, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem;
-        margin: 0.1rem 0;
-        font-weight: 500;
-        color: white;
-        text-align: center;
-    }
-    
-    .intramural-block {
-        background: rgba(230, 126, 34, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem;
-        margin: 0.1rem 0;
-        font-weight: 500;
-        color: white;
-        text-align: center;
-    }
-    
-    .break-block {
-        background: rgba(253, 121, 168, 0.3);
-        border-radius: 4px;
-        padding: 0.25rem;
-        margin: 0.1rem 0;
-        font-weight: 500;
-        color: white;
-        text-align: center;
     }
     
     .stats-grid {
@@ -302,7 +215,7 @@ st.markdown("""
     .legend {
         display: flex;
         justify-content: center;
-        gap: 1.5rem;
+        gap: 1rem;
         margin: 1rem 0;
         flex-wrap: wrap;
     }
@@ -313,6 +226,9 @@ st.markdown("""
         gap: 0.5rem;
         font-size: 0.85rem;
         color: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem 0.75rem;
+        border-radius: 20px;
     }
     
     .legend-color {
@@ -335,6 +251,49 @@ st.markdown("""
         color: #6c5ce7;
         min-width: 150px;
         text-align: center;
+    }
+    
+    /* Color coding for schedule cells */
+    .class-cell {
+        background-color: #3742fa !important;
+        color: white !important;
+        font-weight: 600 !important;
+    }
+    
+    .study-cell {
+        background-color: #5f27cd !important;
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    
+    .meal-cell {
+        background-color: #ff9f43 !important;
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    
+    .activity-cell {
+        background-color: #e67e22 !important;
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    
+    .free-cell {
+        background-color: #00d2d3 !important;
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    
+    .sleep-cell {
+        background-color: #2f3542 !important;
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    
+    .break-cell {
+        background-color: #ff6b6b !important;
+        color: white !important;
+        font-weight: 500 !important;
     }
     
     /* Button styling */
@@ -376,8 +335,8 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4) !important;
     }
     
-    /* Form styling with better readability */
-    .stSelectbox label, .stTextInput label, .stSlider label {
+    /* Form styling */
+    .stSelectbox label, .stTextInput label, .stSlider label, .stTimeInput label {
         color: #ffffff !important;
         font-weight: 600 !important;
         font-size: 1rem !important;
@@ -424,21 +383,13 @@ st.markdown("""
     }
     
     @media (max-width: 768px) {
-        .compact-hero h1 {
-            font-size: 1.8rem;
+        .app-title {
+            font-size: 1.6rem;
         }
         
         .main-container {
             margin: 0.25rem;
             padding: 1rem;
-        }
-        
-        .schedule-table {
-            font-size: 0.8rem;
-        }
-        
-        .schedule-table th, .schedule-table td {
-            padding: 0.4rem 0.3rem;
         }
         
         .legend {
@@ -490,6 +441,97 @@ def extract_text_from_file(file):
     except:
         return ""
 
+def parse_class_schedule(text):
+    """Extract class schedule from syllabus"""
+    class_times = []
+    
+    # Patterns to find class times
+    time_patterns = [
+        r'([A-Z][a-z]+(?:day)?)\s*,?\s*([A-Z][a-z]+(?:day)?)\s*,?\s*([A-Z][a-z]+(?:day)?)?\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
+        r'([A-Z][a-z]+(?:day)?)\s*&?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
+        r'([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
+        r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*,?\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?'
+    ]
+    
+    for pattern in time_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            # Process the match to extract days and times
+            days = [day for day in match if day and day.lower() in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']]
+            times = [time for time in match if ':' in time]
+            
+            if len(times) >= 2:
+                start_time = times[0]
+                end_time = times[1]
+                
+                # Normalize day names
+                normalized_days = []
+                for day in days:
+                    day_lower = day.lower()
+                    if day_lower in ['monday', 'mon']:
+                        normalized_days.append('Monday')
+                    elif day_lower in ['tuesday', 'tue']:
+                        normalized_days.append('Tuesday')
+                    elif day_lower in ['wednesday', 'wed']:
+                        normalized_days.append('Wednesday')
+                    elif day_lower in ['thursday', 'thu']:
+                        normalized_days.append('Thursday')
+                    elif day_lower in ['friday', 'fri']:
+                        normalized_days.append('Friday')
+                    elif day_lower in ['saturday', 'sat']:
+                        normalized_days.append('Saturday')
+                    elif day_lower in ['sunday', 'sun']:
+                        normalized_days.append('Sunday')
+                
+                if normalized_days:
+                    class_times.append({
+                        'days': normalized_days,
+                        'start_time': start_time,
+                        'end_time': end_time,
+                        'type': 'Lecture'
+                    })
+    
+    # Look for lab times
+    lab_patterns = [
+        r'[Ll]ab\s*:?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
+        r'[Ll]aboratory\s*:?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?'
+    ]
+    
+    for pattern in lab_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            day = match[0]
+            start_time = match[1]
+            end_time = match[2]
+            
+            # Normalize day name
+            day_lower = day.lower()
+            if day_lower in ['monday', 'mon']:
+                normalized_day = 'Monday'
+            elif day_lower in ['tuesday', 'tue']:
+                normalized_day = 'Tuesday'
+            elif day_lower in ['wednesday', 'wed']:
+                normalized_day = 'Wednesday'
+            elif day_lower in ['thursday', 'thu']:
+                normalized_day = 'Thursday'
+            elif day_lower in ['friday', 'fri']:
+                normalized_day = 'Friday'
+            elif day_lower in ['saturday', 'sat']:
+                normalized_day = 'Saturday'
+            elif day_lower in ['sunday', 'sun']:
+                normalized_day = 'Sunday'
+            else:
+                continue
+                
+            class_times.append({
+                'days': [normalized_day],
+                'start_time': start_time,
+                'end_time': end_time,
+                'type': 'Lab'
+            })
+    
+    return class_times
+
 def parse_single_syllabus(text, course_code_hint=None):
     """Parse a single syllabus for ONE specific course"""
     assignments = []
@@ -527,6 +569,10 @@ def parse_single_syllabus(text, course_code_hint=None):
                 'code': 'COURSE101',
                 'name': 'Course'
             }
+    
+    # Extract class schedule
+    class_schedule = parse_class_schedule(text)
+    course_info['class_schedule'] = class_schedule
     
     # Extract assignments/deadlines
     date_patterns = [
@@ -585,17 +631,39 @@ def parse_single_syllabus(text, course_code_hint=None):
     
     return course_info, assignments
 
+def generate_time_slots():
+    """Generate 30-minute time slots"""
+    time_slots = []
+    for hour in range(6, 24):  # 6 AM to 11:30 PM
+        for minute in [0, 30]:
+            time_obj = time(hour, minute)
+            if hour == 0:
+                time_str = f"12:{minute:02d} AM"
+            elif hour < 12:
+                time_str = f"{hour}:{minute:02d} AM"
+            elif hour == 12:
+                time_str = f"12:{minute:02d} PM"
+            else:
+                time_str = f"{hour-12}:{minute:02d} PM"
+            time_slots.append(time_str)
+    return time_slots
+
+def time_to_slot_index(time_str):
+    """Convert time string to slot index"""
+    time_slots = generate_time_slots()
+    try:
+        return time_slots.index(time_str)
+    except ValueError:
+        # Try to find closest match
+        for i, slot in enumerate(time_slots):
+            if time_str in slot:
+                return i
+        return 0
+
 def generate_weekly_schedule(courses, assignments, intramurals, preferences):
-    """Generate a structured weekly schedule with readable activities"""
+    """Generate a structured weekly schedule with 30-minute increments"""
     schedule = {}
-    
-    # Time slots for the schedule
-    time_slots = [
-        "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
-        "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
-    ]
-    
+    time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
     # Generate 4 weeks of schedule
@@ -606,77 +674,135 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
             daily_schedule = {}
             is_weekend = day in ["Saturday", "Sunday"]
             
+            # Initialize all slots as free
             for time_slot in time_slots:
-                activities = []
+                daily_schedule[time_slot] = {"activity": "Free Time", "type": "free"}
+            
+            # Add sleep schedule
+            wake_time = preferences.get('wake_time', 8)
+            bedtime = preferences.get('bedtime', 11)
+            
+            # Add bedtime (handle PM times)
+            if bedtime >= 10:
+                bedtime_str = f"{bedtime}:00 PM"
+            else:
+                bedtime_str = f"{bedtime + 12}:00 AM"
+            
+            # Fill sleep times
+            for time_slot in time_slots:
+                hour = int(time_slot.split(':')[0])
+                is_pm = 'PM' in time_slot
+                is_am = 'AM' in time_slot
                 
-                # Wake up routine
-                if time_slot == "7:00 AM":
-                    activities.append("Wake Up & Morning Routine")
+                if is_pm and hour != 12:
+                    hour += 12
+                elif is_am and hour == 12:
+                    hour = 0
                 
-                # Breakfast
-                elif time_slot == "8:00 AM":
-                    activities.append("Breakfast")
-                
-                # Study blocks (weekdays)
-                elif time_slot in ["9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"] and not is_weekend:
+                # Sleep from bedtime to wake time
+                if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
+                    daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep"}
+            
+            # Add class times
+            for course in courses:
+                if 'class_schedule' in course:
+                    for class_time in course['class_schedule']:
+                        if day in class_time['days']:
+                            start_time = class_time['start_time']
+                            end_time = class_time['end_time']
+                            class_type = class_time['type']
+                            
+                            # Convert to proper format and find slots
+                            try:
+                                start_slot = time_to_slot_index(start_time)
+                                end_slot = time_to_slot_index(end_time)
+                                
+                                for i in range(start_slot, min(end_slot, len(time_slots))):
+                                    if i < len(time_slots):
+                                        daily_schedule[time_slots[i]] = {
+                                            "activity": f"{course['code']} - {class_type}",
+                                            "type": "class"
+                                        }
+                            except:
+                                continue
+            
+            # Add intramural activities
+            for intramural in intramurals:
+                if intramural.get('scheduled') and day in intramural.get('days', []):
+                    start_time = intramural.get('start_time', '5:00 PM')
+                    duration = intramural.get('duration', 90)  # minutes
+                    
+                    try:
+                        start_slot = time_to_slot_index(start_time)
+                        slots_needed = duration // 30
+                        
+                        for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
+                            if i < len(time_slots):
+                                daily_schedule[time_slots[i]] = {
+                                    "activity": f"{intramural['name']} - {intramural['type']}",
+                                    "type": "activity"
+                                }
+                    except:
+                        continue
+            
+            # Add meals
+            meal_times = {
+                "8:00 AM": "Breakfast",
+                "12:00 PM": "Lunch", 
+                "6:00 PM": "Dinner"
+            }
+            
+            for meal_time, meal_name in meal_times.items():
+                if meal_time in daily_schedule:
+                    daily_schedule[meal_time] = {"activity": meal_name, "type": "meal"}
+            
+            # Add study sessions (avoid class times and meals)
+            if not is_weekend:
+                study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
+            else:
+                study_times = ["10:00 AM", "2:00 PM"]
+            
+            for study_time in study_times:
+                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
                     if courses:
                         course = random.choice(courses)
-                        study_types = ['Reading', 'Practice Problems', 'Review Notes', 'Homework', 'Study Group']
+                        study_types = ['Reading', 'Practice', 'Review', 'Homework']
                         study_type = random.choice(study_types)
-                        activities.append(f"{course['code']} - {study_type}")
-                
-                # Light study on weekends
-                elif time_slot in ["10:00 AM", "2:00 PM"] and is_weekend:
-                    if courses and random.random() < 0.5:  # 50% chance
-                        course = random.choice(courses)
-                        activities.append(f"{course['code']} - Light Review")
-                
-                # Lunch
-                elif time_slot == "12:00 PM":
-                    activities.append("Lunch Break")
-                
-                # Short breaks
-                elif time_slot in ["11:00 AM", "4:00 PM"]:
-                    activities.append("Break / Walk")
-                
-                # Intramural activities
-                elif time_slot == "5:00 PM" and intramurals:
-                    for intramural in intramurals:
-                        if intramural.get('scheduled'):
-                            if day in intramural.get('days', []):
-                                activities.append(f"{intramural['name']} - {intramural['type']}")
-                                break
-                    else:
-                        if not is_weekend:
-                            activities.append("Exercise / Intramural Time")
-                
-                # Dinner
-                elif time_slot == "6:00 PM":
-                    activities.append("Dinner")
-                
-                # Evening study
-                elif time_slot == "7:00 PM" and not is_weekend:
-                    if courses:
-                        course = random.choice(courses)
-                        activities.append(f"{course['code']} - Evening Study")
-                
-                # Free time / Social
-                elif time_slot in ["8:00 PM", "9:00 PM"]:
-                    if is_weekend:
-                        activities.append("Social Time / Fun")
-                    else:
-                        free_activities = ['Gaming', 'Netflix', 'Social Media', 'Reading for Fun', 'Friends']
-                        activities.append(random.choice(free_activities))
-                
-                # Wind down
-                elif time_slot == "10:00 PM":
-                    activities.append("Wind Down / Prep for Sleep")
-                
-                # Store activities (join if multiple)
-                if activities:
-                    daily_schedule[time_slot] = " | ".join(activities)
-                else:
-                    daily_schedule[time_slot] = "Free Time"
+                        daily_schedule[study_time] = {
+                            "activity": f"{course['code']} - {study_type}",
+                            "type": "study"
+                        }
+            
+            # Add breaks
+            break_times = ["10:30 AM", "3:30 PM"]
+            for break_time in break_times:
+                if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
+                    daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break"}
+            
+            # Check for upcoming deadlines and add extra study time
+            upcoming_deadlines = []
+            for assignment in assignments:
+                try:
+                    deadline_date = datetime.strptime(assignment['date'], '%Y-%m-%d')
+                    current_date = datetime.now() + timedelta(days=week*7 + ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index(day))
+                    days_until = (deadline_date - current_date).days
+                    
+                    if 0 <= days_until <= 7:  # Deadline within a week
+                        upcoming_deadlines.append(assignment)
+                except:
+                    continue
+            
+            # Add extra study time for upcoming deadlines
+            if upcoming_deadlines:
+                for deadline in upcoming_deadlines:
+                    # Find a free slot and add focused study time
+                    for time_slot in ["9:00 AM", "1:00 PM", "8:00 PM"]:
+                        if time_slot in daily_schedule and daily_schedule[time_slot]["type"] == "free":
+                            daily_schedule[time_slot] = {
+                                "activity": f"{deadline['course']} - {deadline['type'].title()} Prep",
+                                "type": "study"
+                            }
+                            break
             
             weekly_schedule[day] = daily_schedule
         
@@ -685,13 +811,8 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
     return schedule
 
 def create_schedule_dataframe(weekly_schedule):
-    """Create a pandas DataFrame for the schedule table"""
-    time_slots = [
-        "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
-        "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
-    ]
-    
+    """Create a pandas DataFrame for the schedule table with color coding"""
+    time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
     # Create the dataframe
@@ -699,74 +820,130 @@ def create_schedule_dataframe(weekly_schedule):
     for time_slot in time_slots:
         row = [time_slot]
         for day in days:
-            activity = weekly_schedule.get(day, {}).get(time_slot, "Free Time")
+            slot_data = weekly_schedule.get(day, {}).get(time_slot, {"activity": "Free Time", "type": "free"})
+            activity = slot_data["activity"]
             row.append(activity)
         data.append(row)
     
     df = pd.DataFrame(data, columns=["Time"] + days)
     return df
 
+def style_schedule_dataframe(df, weekly_schedule):
+    """Apply color coding to the schedule dataframe"""
+    def color_cell(val):
+        # Get the type from the weekly schedule
+        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
+            for time_slot in weekly_schedule.get(day, {}):
+                slot_data = weekly_schedule[day][time_slot]
+                if slot_data["activity"] == val:
+                    activity_type = slot_data["type"]
+                    if activity_type == "class":
+                        return "background-color: #3742fa; color: white; font-weight: bold;"
+                    elif activity_type == "study":
+                        return "background-color: #5f27cd; color: white; font-weight: bold;"
+                    elif activity_type == "meal":
+                        return "background-color: #ff9f43; color: white; font-weight: bold;"
+                    elif activity_type == "activity":
+                        return "background-color: #e67e22; color: white; font-weight: bold;"
+                    elif activity_type == "sleep":
+                        return "background-color: #2f3542; color: white; font-weight: bold;"
+                    elif activity_type == "break":
+                        return "background-color: #ff6b6b; color: white; font-weight: bold;"
+                    elif activity_type == "free":
+                        return "background-color: #00d2d3; color: white; font-weight: bold;"
+        return "background-color: #00d2d3; color: white; font-weight: bold;"  # Default to free time
+    
+    return df.style.applymap(color_cell, subset=df.columns[1:])
+
 def generate_pdf_schedule(schedule_data, user_data):
-    """Generate a PDF schedule"""
+    """Generate a PDF schedule with wellness reminders"""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
     
     # Create custom styles
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        'CustomTitle',
+        'Title',
         parent=styles['Heading1'],
-        fontSize=24,
-        spaceAfter=30,
+        fontSize=18,
+        spaceAfter=12,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#6c5ce7')
+    )
+    
+    wellness_style = ParagraphStyle(
+        'Wellness',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6,
+        textColor=colors.HexColor('#2f3542'),
+        leftIndent=20
     )
     
     # Build the story
     story = []
     
-    # Title
+    # Compact title
     story.append(Paragraph("🎯 FocusFlow Schedule", title_style))
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 12))
+    
+    # Wellness reminder at the top
+    story.append(Paragraph("📋 Important Reminders", styles['Heading2']))
+    story.append(Paragraph("• <b>Sleep is crucial:</b> This schedule prioritizes 7-9 hours of sleep for optimal learning and memory consolidation.", wellness_style))
+    story.append(Paragraph("• <b>Sample schedule:</b> This is one possible arrangement. Adjust times and activities based on your needs and preferences.", wellness_style))
+    story.append(Paragraph("• <b>Flexibility matters:</b> Use 'buffer time' between classes for walking, transitions, or short breaks.", wellness_style))
+    story.append(Paragraph("• <b>Balance is key:</b> Notice how study time is balanced with meals, exercise, and relaxation.", wellness_style))
+    story.append(Spacer(1, 16))
     
     # Add schedule tables for each week
     for week_num in range(4):
         week_key = f'week_{week_num}'
         if week_key in schedule_data:
             # Week header
-            story.append(Paragraph(f"Week {week_num + 1}", styles['Heading2']))
-            story.append(Spacer(1, 12))
+            story.append(Paragraph(f"Week {week_num + 1}", styles['Heading3']))
+            story.append(Spacer(1, 8))
             
             # Create schedule table
             weekly_schedule = schedule_data[week_key]
             df = create_schedule_dataframe(weekly_schedule)
             
-            # Convert to table data
+            # Convert to table data (show only key times to save space)
+            key_times = ["7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
+                        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
+                        "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"]
+            
             table_data = []
             for _, row in df.iterrows():
-                table_data.append(list(row))
+                if row['Time'] in key_times:
+                    table_data.append(list(row))
             
             # Create table
-            table = Table(table_data, colWidths=[0.8*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch])
+            table = Table(table_data, colWidths=[0.8*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch])
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9ff')),
+                ('FONTSIZE', (0, 0), (-1, 0), 7),
                 ('FONTSIZE', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9ff')),
                 ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e0e6ff')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f8f9ff'), colors.HexColor('#ffffff')])
             ]))
             
             story.append(table)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 12))
             
             # Page break after each week except the last
             if week_num < 3:
                 story.append(PageBreak())
+    
+    # Footer with color legend
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("🎨 Color Guide", styles['Heading3']))
+    story.append(Paragraph("Classes: Blue | Study: Purple | Meals: Orange | Activities: Brown | Sleep: Dark Gray | Breaks: Red | Free Time: Teal", wellness_style))
     
     # Build PDF
     doc.build(story)
@@ -774,14 +951,10 @@ def generate_pdf_schedule(schedule_data, user_data):
     return buffer
 
 def main():
-    # Compact Hero Section
-    st.markdown("""
-    <div class="main-container">
-        <div class="compact-hero">
-            <h1>🎯 FocusFlow</h1>
-            <p>Balance academics with wellness and life</p>
-        </div>
-    """, unsafe_allow_html=True)
+    # Simple title
+    st.markdown('<h1 class="app-title">🎯 FocusFlow</h1>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
     # Step-by-step flow
     if st.session_state.step == 1:
@@ -794,24 +967,35 @@ def main():
     st.markdown("</div>", unsafe_allow_html=True)
 
 def show_course_setup():
-    """Step 1: Individual course setup"""
+    """Step 1: Individual course setup with class schedule confirmation"""
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">1</span>Add Your Courses</h2>
-        <p>Upload each syllabus individually for accurate course detection. Each upload should be for one specific course.</p>
+        <p>Upload each syllabus individually. We'll extract class times and you can confirm or edit them.</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Show current courses
     if st.session_state.courses:
         st.markdown("### 📚 Your Courses")
-        for course in st.session_state.courses:
+        for i, course in enumerate(st.session_state.courses):
             st.markdown(f"""
             <div class="course-card">
                 <div class="course-code">{course['code']}</div>
                 <div class="course-name">{course['name']}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Show class schedule
+            if 'class_schedule' in course and course['class_schedule']:
+                st.markdown(f"**Class Schedule for {course['code']}:**")
+                for class_time in course['class_schedule']:
+                    days_str = ", ".join(class_time['days'])
+                    st.markdown(f"""
+                    <div class="class-schedule">
+                        <div class="class-schedule-item">{class_time['type']}: {days_str}, {class_time['start_time']} - {class_time['end_time']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
     
     # Add new course section
     st.markdown("### ➕ Add New Course")
@@ -819,38 +1003,142 @@ def show_course_setup():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Course code input for better parsing
         course_code = st.text_input(
             "Course Code (e.g., BIO1205, MATH101)",
-            placeholder="Enter course code",
-            help="This helps us identify the course in your syllabus"
+            placeholder="Enter course code"
         )
         
-        # File upload
         uploaded_file = st.file_uploader(
-            "📄 Upload Syllabus for This Course",
+            "📄 Upload Syllabus",
             type=['pdf', 'docx', 'txt'],
-            help="Upload the syllabus for the course code above"
+            help="Upload the syllabus for this course"
         )
     
     with col2:
-        # Add course button
         if st.button("📚 Add Course", disabled=not (course_code and uploaded_file)):
             if course_code and uploaded_file:
                 with st.spinner(f"🧠 Analyzing syllabus for {course_code}..."):
                     text = extract_text_from_file(uploaded_file)
                     course_info, assignments = parse_single_syllabus(text, course_code)
                     
-                    # Add to session state
-                    st.session_state.courses.append(course_info)
+                    # Store for confirmation
+                    st.session_state.temp_course = course_info
+                    st.session_state.temp_assignments = assignments
+                    st.session_state.show_confirmation = True
                     
-                    # Store assignments
-                    if 'assignments' not in st.session_state:
-                        st.session_state.assignments = []
-                    st.session_state.assignments.extend(assignments)
-                    
-                    st.success(f"✅ Added {course_info['code']} with {len(assignments)} assignments!")
                     st.rerun()
+    
+    # Show confirmation dialog
+    if st.session_state.get('show_confirmation', False):
+        st.markdown("### 🔍 Confirm Course Details")
+        
+        temp_course = st.session_state.temp_course
+        
+        # Course info confirmation
+        confirmed_code = st.text_input("Course Code", value=temp_course['code'])
+        confirmed_name = st.text_input("Course Name", value=temp_course['name'])
+        
+        # Class schedule confirmation
+        st.markdown("**Class Schedule (extracted from syllabus):**")
+        
+        if 'class_schedule' in temp_course and temp_course['class_schedule']:
+            for i, class_time in enumerate(temp_course['class_schedule']):
+                st.markdown(f"**{class_time['type']} {i+1}:**")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    days = st.multiselect(
+                        "Days",
+                        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                        default=class_time['days'],
+                        key=f"days_{i}"
+                    )
+                
+                with col2:
+                    start_time = st.time_input(
+                        "Start Time",
+                        value=datetime.strptime(class_time['start_time'], '%H:%M').time() if ':' in class_time['start_time'] else time(9, 0),
+                        key=f"start_{i}"
+                    )
+                
+                with col3:
+                    end_time = st.time_input(
+                        "End Time", 
+                        value=datetime.strptime(class_time['end_time'], '%H:%M').time() if ':' in class_time['end_time'] else time(10, 0),
+                        key=f"end_{i}"
+                    )
+                
+                with col4:
+                    class_type = st.selectbox(
+                        "Type",
+                        ["Lecture", "Lab", "Recitation", "Seminar"],
+                        index=0 if class_time['type'] == 'Lecture' else 1,
+                        key=f"type_{i}"
+                    )
+                
+                # Update the class schedule
+                temp_course['class_schedule'][i] = {
+                    'days': days,
+                    'start_time': start_time.strftime('%H:%M'),
+                    'end_time': end_time.strftime('%H:%M'),
+                    'type': class_type
+                }
+        else:
+            st.info("No class schedule found in syllabus. Add manually:")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                days = st.multiselect(
+                    "Days",
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    key="manual_days"
+                )
+            
+            with col2:
+                start_time = st.time_input("Start Time", value=time(9, 0), key="manual_start")
+            
+            with col3:
+                end_time = st.time_input("End Time", value=time(10, 0), key="manual_end")
+            
+            with col4:
+                class_type = st.selectbox("Type", ["Lecture", "Lab", "Recitation", "Seminar"], key="manual_type")
+            
+            if days:
+                temp_course['class_schedule'] = [{
+                    'days': days,
+                    'start_time': start_time.strftime('%H:%M'),
+                    'end_time': end_time.strftime('%H:%M'),
+                    'type': class_type
+                }]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("✅ Confirm & Add Course"):
+                temp_course['code'] = confirmed_code
+                temp_course['name'] = confirmed_name
+                
+                st.session_state.courses.append(temp_course)
+                
+                if 'assignments' not in st.session_state:
+                    st.session_state.assignments = []
+                st.session_state.assignments.extend(st.session_state.temp_assignments)
+                
+                # Clear temp data
+                del st.session_state.temp_course
+                del st.session_state.temp_assignments
+                st.session_state.show_confirmation = False
+                
+                st.success(f"✅ Added {confirmed_code}!")
+                st.rerun()
+        
+        with col2:
+            if st.button("❌ Cancel"):
+                del st.session_state.temp_course
+                del st.session_state.temp_assignments
+                st.session_state.show_confirmation = False
+                st.rerun()
     
     # Manual course addition
     with st.expander("➕ Add Course Manually"):
@@ -861,7 +1149,8 @@ def show_course_setup():
             if manual_code and manual_name:
                 course_info = {
                     'code': manual_code,
-                    'name': manual_name
+                    'name': manual_name,
+                    'class_schedule': []
                 }
                 st.session_state.courses.append(course_info)
                 st.success(f"✅ Added {manual_code} manually!")
@@ -880,14 +1169,14 @@ def show_course_setup():
             st.session_state.step = 2
             st.rerun()
     else:
-        st.info("👆 Add at least one course to continue to the next step")
+        st.info("👆 Add at least one course to continue")
 
 def show_preferences_step():
-    """Step 2: Preferences setup"""
+    """Step 2: Preferences setup with AM/PM sleep scheduler"""
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">2</span>Personalize Your Schedule</h2>
-        <p>Set your preferences to create a schedule that works for your lifestyle</p>
+        <p>Set your preferences to create a balanced schedule</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -895,8 +1184,16 @@ def show_preferences_step():
     
     with col1:
         st.markdown("### ⏰ Time Preferences")
-        wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00")
-        bedtime = st.slider("Bedtime", 10, 2, 11, format="%d:00")
+        wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
+        
+        # Bedtime with AM/PM
+        bedtime_hour = st.slider("Bedtime hour", 9, 2, 11)
+        if bedtime_hour >= 9:
+            bedtime_display = f"{bedtime_hour}:00 PM"
+        else:
+            bedtime_display = f"{bedtime_hour}:00 AM"
+        
+        st.write(f"**Bedtime: {bedtime_display}**")
         
         st.markdown("### 📚 Study Preferences")
         attention_span = st.slider("Study session length (minutes)", 15, 90, 45)
@@ -911,26 +1208,31 @@ def show_preferences_step():
         
         if include_intramurals:
             st.markdown("**Add Your Activities:**")
-            activity_name = st.text_input("Activity Name (e.g., Soccer, Basketball)")
-            activity_type = st.selectbox("Activity Type", ["Practice", "Game", "Workout", "Club Meeting"])
+            activity_name = st.text_input("Activity Name (e.g., Soccer, Basketball)", key="activity_name")
+            activity_type = st.selectbox("Activity Type", ["Practice", "Game", "Workout", "Club Meeting"], key="activity_type")
             
             # Activity scheduling
-            is_scheduled = st.checkbox("Has specific schedule?", value=False)
+            is_scheduled = st.checkbox("Has specific schedule?", value=False, key="is_scheduled")
             
             if is_scheduled:
                 selected_days = st.multiselect(
                     "Select days",
-                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    key="selected_days"
                 )
-                activity_time = st.time_input("Time", value=datetime.strptime("17:00", "%H:%M").time())
+                activity_start_time = st.time_input("Start Time", value=time(17, 0), key="activity_start_time")
+                activity_duration = st.slider("Duration (minutes)", 30, 180, 90, key="activity_duration")
+                
+                st.write(f"**Schedule: {', '.join(selected_days)} at {activity_start_time.strftime('%I:%M %p')} for {activity_duration} minutes**")
             
-            if st.button("Add Activity") and activity_name:
+            if st.button("Add Activity", key="add_activity") and activity_name:
                 intramural = {
                     'name': activity_name,
                     'type': activity_type,
                     'scheduled': is_scheduled,
                     'days': selected_days if is_scheduled else [],
-                    'time': activity_time.strftime("%H:%M") if is_scheduled else None
+                    'start_time': activity_start_time.strftime('%I:%M %p') if is_scheduled else None,
+                    'duration': activity_duration if is_scheduled else 60
                 }
                 st.session_state.intramurals.append(intramural)
                 st.success(f"✅ Added {activity_name}!")
@@ -948,30 +1250,31 @@ def show_preferences_step():
                 schedule_info = ""
                 if intramural.get('scheduled'):
                     days = ", ".join(intramural.get('days', []))
-                    time = intramural.get('time', 'TBD')
-                    schedule_info = f" - {days} at {time}"
+                    start_time = intramural.get('start_time', 'TBD')
+                    duration = intramural.get('duration', 60)
+                    schedule_info = f" - {days} at {start_time} ({duration} min)"
                 
                 st.markdown(f"""
                 <div class="activity-item">
-                    {intramural['name']} ({intramural['type']}){schedule_info}
+                    <strong>{intramural['name']}</strong> ({intramural['type']}){schedule_info}
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Wellness information (no checkboxes - automatically included)
+    # Wellness information
     st.markdown("""
     <div class="wellness-info">
         <h4>🌟 Wellness Focus (Automatically Included)</h4>
-        <p><strong>Sleep:</strong> Regular sleep schedule is crucial for memory consolidation and focus</p>
-        <p><strong>Meals:</strong> Consistent eating times maintain energy levels and brain function</p>
-        <p><strong>Free Time:</strong> Relaxation and social time prevent burnout and improve wellbeing</p>
-        <p><strong>Balance:</strong> A balanced schedule is more sustainable and effective long-term</p>
+        <p><strong>Sleep:</strong> 7-9 hours prioritized for memory consolidation and focus</p>
+        <p><strong>Meals:</strong> Regular eating times maintain energy and brain function</p>
+        <p><strong>Free Time:</strong> Social time and relaxation prevent burnout</p>
+        <p><strong>Balance:</strong> Sustainable schedule for long-term success</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Store preferences
     preferences = {
         'wake_time': wake_time,
-        'bedtime': bedtime,
+        'bedtime': bedtime_hour,
         'attention_span': attention_span,
         'study_intensity': study_intensity,
         'include_intramurals': include_intramurals
@@ -996,7 +1299,7 @@ def show_preferences_step():
     
     with col2:
         if st.button("🎨 Generate Schedule", type="primary"):
-            with st.spinner("🎨 Creating your personalized weekly schedule..."):
+            with st.spinner("🎨 Creating your personalized schedule..."):
                 schedule = generate_weekly_schedule(
                     st.session_state.courses,
                     st.session_state.get('assignments', []),
@@ -1008,11 +1311,11 @@ def show_preferences_step():
                 st.rerun()
 
 def show_schedule_step():
-    """Step 3: Schedule display with clean table"""
+    """Step 3: Schedule display with color-coded table"""
     st.markdown("""
     <div class="setup-card">
-        <h2><span class="step-number">3</span>Your Weekly Schedule</h2>
-        <p>Here's your personalized weekly schedule that balances academics with wellness and life</p>
+        <h2><span class="step-number">3</span>Your Color-Coded Schedule</h2>
+        <p>30-minute increments with automatic class times, deadlines, and wellness balance</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1043,6 +1346,40 @@ def show_schedule_step():
     </div>
     """, unsafe_allow_html=True)
     
+    # Color legend
+    st.markdown("""
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #3742fa;"></div>
+            <span>📚 Classes</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #5f27cd;"></div>
+            <span>📖 Study</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff9f43;"></div>
+            <span>🍽️ Meals</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #e67e22;"></div>
+            <span>🏃 Activities</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #2f3542;"></div>
+            <span>😴 Sleep</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff6b6b;"></div>
+            <span>☕ Breaks</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #00d2d3;"></div>
+            <span>🎉 Free Time</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Week navigation
     if st.session_state.final_schedule:
         total_weeks = len(st.session_state.final_schedule)
@@ -1063,27 +1400,19 @@ def show_schedule_step():
                 st.session_state.current_week = min(total_weeks - 1, current_week + 1)
                 st.rerun()
         
-        # Display current week as a clean table
+        # Display current week
         week_key = f'week_{current_week}'
         if week_key in st.session_state.final_schedule:
             weekly_schedule = st.session_state.final_schedule[week_key]
             df = create_schedule_dataframe(weekly_schedule)
+            styled_df = style_schedule_dataframe(df, weekly_schedule)
             
             # Display the schedule table
             st.dataframe(
-                df,
+                styled_df,
                 use_container_width=True,
                 hide_index=True,
-                column_config={
-                    "Time": st.column_config.Column(width="small"),
-                    "Monday": st.column_config.Column(width="medium"),
-                    "Tuesday": st.column_config.Column(width="medium"),
-                    "Wednesday": st.column_config.Column(width="medium"),
-                    "Thursday": st.column_config.Column(width="medium"),
-                    "Friday": st.column_config.Column(width="medium"),
-                    "Saturday": st.column_config.Column(width="medium"),
-                    "Sunday": st.column_config.Column(width="medium"),
-                }
+                height=800
             )
     
     # Export section
@@ -1099,7 +1428,7 @@ def show_schedule_step():
             data=pdf_data,
             file_name=f"FocusFlow_Schedule_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
-            help="Download a beautifully formatted PDF of your 4-week schedule"
+            help="Download your complete 4-week schedule with wellness reminders"
         )
     
     # Navigation
@@ -1128,13 +1457,14 @@ def show_schedule_step():
     st.success(f"""
     🎉 **Your FocusFlow Schedule is Ready!**
     
-    ✅ **{courses_count} courses** with structured study sessions
-    ✅ **{assignments_count} assignments** tracked and planned
-    ✅ **{intramurals_count} activities** integrated into your schedule
-    ✅ **Wellness-focused design** with sleep, meals, and free time prioritized
-    ✅ **4 weeks** of detailed planning ready for download
+    ✅ **{courses_count} courses** with actual class times integrated
+    ✅ **{assignments_count} assignments** with deadline-focused study sessions
+    ✅ **{intramurals_count} activities** scheduled with proper duration
+    ✅ **30-minute increments** for precise time management
+    ✅ **Color-coded activities** for easy visual scanning
+    ✅ **Wellness-focused design** with sleep, meals, and balance prioritized
     
-    📚 **Remember:** This schedule emphasizes balance - academics, wellness, and life all matter for your success!
+    📚 **Remember:** This is a sample schedule to get you started. Adjust times and activities to fit your specific needs!
     """)
 
 if __name__ == "__main__":
