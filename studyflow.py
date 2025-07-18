@@ -436,20 +436,42 @@ def parse_excel_course_file(file):
         excel_data = pd.read_excel(file, sheet_name=None, header=None)
         courses = []
         
+        st.write(f"Found {len(excel_data)} sheets in the Excel file")
+        
         # Process each sheet (each course)
         for sheet_name, df in excel_data.items():
+            st.write(f"Processing sheet: {sheet_name}")
+            
+            # Only process sheets that start with "Course" and have data
             if sheet_name.startswith('Course'):
                 course_data = {}
                 assignments = []
                 
                 # Safety check - ensure dataframe has enough rows and columns
-                if df.shape[0] < 5 or df.shape[1] < 2:
-                    st.warning(f"Sheet {sheet_name} appears to be empty or too small. Skipping...")
+                if df.shape[0] < 3 or df.shape[1] < 2:
+                    st.warning(f"Sheet {sheet_name} is too small (only {df.shape[0]} rows, {df.shape[1]} columns). Skipping...")
                     continue
                 
+                # Check if the sheet actually has course data
+                has_course_data = False
+                for index in range(min(10, df.shape[0])):
+                    try:
+                        if index < df.shape[0] and df.shape[1] >= 2:
+                            field_val = df.iloc[index, 0]
+                            if pd.notna(field_val) and 'Course title' in str(field_val):
+                                has_course_data = True
+                                break
+                    except (IndexError, KeyError):
+                        continue
+                
+                if not has_course_data:
+                    st.warning(f"Sheet {sheet_name} doesn't contain course data. Skipping...")
+                    continue
+                
+                st.write(f"Processing course data from {sheet_name}...")
+                
                 # Read course information (safely iterate through available rows)
-                max_rows = min(20, df.shape[0])  # Don't exceed available rows
-                max_cols = min(2, df.shape[1])   # Don't exceed available columns
+                max_rows = min(25, df.shape[0])  # Increased range for course info
                 
                 for index in range(max_rows):
                     try:
@@ -463,8 +485,10 @@ def parse_excel_course_file(file):
                                 
                                 if 'Course title' in field:
                                     course_data['name'] = value
+                                    st.write(f"Found course: {value}")
                                 elif 'Course Lecture Schedule' in field:
                                     course_data['lecture_schedule'] = value
+                                    st.write(f"Found lecture schedule: {value}")
                                 elif 'Lecture location' in field:
                                     course_data['lecture_location'] = value
                                 elif 'When in lab' in field:
@@ -477,10 +501,16 @@ def parse_excel_course_file(file):
                                     course_data['recitation_location'] = value
                                 elif 'Suggested daily study time' in field:
                                     course_data['daily_study_time'] = value
-                    except (IndexError, KeyError):
+                    except (IndexError, KeyError, Exception) as e:
+                        st.write(f"Error reading row {index}: {e}")
                         continue
                 
-                # Generate course code from name if not provided
+                # Only continue if we found a course name
+                if 'name' not in course_data:
+                    st.warning(f"No course name found in {sheet_name}. Skipping...")
+                    continue
+                
+                # Generate course code from name
                 if 'name' in course_data:
                     # Try to extract course code from name
                     code_match = re.search(r'([A-Z]{2,4})\s*(\d{3,4})', course_data['name'].upper())
@@ -540,7 +570,9 @@ def parse_excel_course_file(file):
                 
                 # Read assignments (safely look for assignment rows)
                 assignment_start_row = 14
-                assignment_end_row = min(30, df.shape[0])
+                assignment_end_row = min(35, df.shape[0])  # Increased range for assignments
+                
+                st.write(f"Looking for assignments in rows {assignment_start_row} to {assignment_end_row}")
                 
                 for index in range(assignment_start_row, assignment_end_row):
                     try:
@@ -563,19 +595,27 @@ def parse_excel_course_file(file):
                                         'course': course_data.get('code', 'UNKNOWN'),
                                         'priority': 'high' if 'Exam' in assignment_type else 'medium'
                                     })
-                    except (IndexError, KeyError):
+                                    st.write(f"Found assignment: {assignment_type} - {due_date}")
+                    except (IndexError, KeyError, Exception) as e:
                         continue
                 
                 course_data['assignments'] = assignments
                 
                 # Only add course if we got some basic info
-                if 'name' in course_data or 'code' in course_data:
+                if 'name' in course_data:
                     courses.append(course_data)
+                    st.write(f"✅ Successfully processed course: {course_data['name']}")
+                else:
+                    st.warning(f"Could not find sufficient course data in {sheet_name}")
+            else:
+                st.info(f"Skipping sheet '{sheet_name}' (doesn't start with 'Course')")
         
+        st.write(f"Total courses processed: {len(courses)}")
         return courses
     
     except Exception as e:
         st.error(f"Error reading Excel file: {str(e)}")
+        st.write("Please check your Excel file format and try again.")
         return []
 
 def generate_time_slots():
