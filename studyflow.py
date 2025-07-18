@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
 import re
-import openpyxl
+# Removed openpyxl - using pandas instead
 from io import BytesIO
 import json
 import uuid
@@ -430,24 +430,23 @@ def parse_days_string(schedule_str):
     return days
 
 def parse_excel_course_file(file):
-    """Parse the Excel file with the specified format"""
+    """Parse the Excel file with the specified format using pandas"""
     try:
-        # Read the Excel file
-        workbook = openpyxl.load_workbook(file)
+        # Read all sheets from the Excel file
+        excel_data = pd.read_excel(file, sheet_name=None, header=None)
         courses = []
         
         # Process each sheet (each course)
-        for sheet_name in workbook.sheetnames:
+        for sheet_name, df in excel_data.items():
             if sheet_name.startswith('Course'):
-                sheet = workbook[sheet_name]
                 course_data = {}
                 assignments = []
                 
-                # Read course information
-                for row in sheet.iter_rows(min_row=1, max_row=20, min_col=1, max_col=2):
-                    if row[0].value and row[1].value:
-                        field = str(row[0].value).strip()
-                        value = str(row[1].value).strip()
+                # Read course information (first 20 rows, first 2 columns)
+                for index, row in df.iloc[:20, :2].iterrows():
+                    if pd.notna(row.iloc[0]) and pd.notna(row.iloc[1]):
+                        field = str(row.iloc[0]).strip()
+                        value = str(row.iloc[1]).strip()
                         
                         if 'Course title' in field:
                             course_data['name'] = value
@@ -473,7 +472,12 @@ def parse_excel_course_file(file):
                     if code_match:
                         course_data['code'] = f"{code_match.group(1)}{code_match.group(2)}"
                     else:
-                        course_data['code'] = course_data['name'].replace(' ', '')[:8]
+                        # Create code from name
+                        name_parts = course_data['name'].split()
+                        if len(name_parts) >= 2:
+                            course_data['code'] = f"{name_parts[0][:3]}{name_parts[1][:3]}".upper()
+                        else:
+                            course_data['code'] = course_data['name'].replace(' ', '')[:6].upper()
                 
                 # Parse class schedules
                 class_schedule = []
@@ -519,12 +523,12 @@ def parse_excel_course_file(file):
                 
                 course_data['class_schedule'] = class_schedule
                 
-                # Read assignments (look for rows with "Large Assignment" or "Exam")
-                for row in sheet.iter_rows(min_row=15, max_row=30, min_col=1, max_col=3):
-                    if row[0].value and row[1].value:
-                        assignment_name = str(row[0].value).strip()
-                        assignment_type = str(row[1].value).strip()
-                        due_date = str(row[2].value).strip() if row[2].value else ""
+                # Read assignments (look for rows with "Large Assignment" or "Exam" in rows 15-30)
+                for index, row in df.iloc[14:30, :3].iterrows():
+                    if pd.notna(row.iloc[0]) and pd.notna(row.iloc[1]):
+                        assignment_name = str(row.iloc[0]).strip()
+                        assignment_type = str(row.iloc[1]).strip()
+                        due_date = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ""
                         
                         if 'Large Assignment' in assignment_name or 'Exam' in assignment_type:
                             assignments.append({
