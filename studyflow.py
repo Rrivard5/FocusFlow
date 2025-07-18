@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
 import re
-import PyPDF2
-import docx
+import openpyxl
 from io import BytesIO
 import json
 import uuid
@@ -253,49 +252,6 @@ st.markdown("""
         text-align: center;
     }
     
-    /* Color coding for schedule cells */
-    .class-cell {
-        background-color: #3742fa !important;
-        color: white !important;
-        font-weight: 600 !important;
-    }
-    
-    .study-cell {
-        background-color: #5f27cd !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
-    .meal-cell {
-        background-color: #ff9f43 !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
-    .activity-cell {
-        background-color: #e67e22 !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
-    .free-cell {
-        background-color: #00d2d3 !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
-    .sleep-cell {
-        background-color: #2f3542 !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
-    .break-cell {
-        background-color: #ff6b6b !important;
-        color: white !important;
-        font-weight: 500 !important;
-    }
-    
     /* Button styling */
     .stButton > button {
         border: none !important;
@@ -421,215 +377,173 @@ if 'schedule_ready' not in st.session_state:
 if 'final_schedule' not in st.session_state:
     st.session_state.final_schedule = None
 
-def extract_text_from_file(file):
-    """Extract text from uploaded file"""
+def parse_time_string(time_str):
+    """Parse time string like '10:40-11:30am' or 'M,W,F 10:40-11:30am'"""
+    if not time_str or str(time_str).lower() == 'n/a':
+        return None
+    
+    # Remove days from the string if present
+    time_part = time_str
+    if any(day in time_str.upper() for day in ['M', 'T', 'W', 'R', 'F', 'S']):
+        parts = time_str.split(' ')
+        if len(parts) > 1:
+            time_part = parts[1]
+    
+    # Extract time range
+    time_match = re.search(r'(\d{1,2}:\d{2})-(\d{1,2}:\d{2})', time_part)
+    if time_match:
+        start_time = time_match.group(1)
+        end_time = time_match.group(2)
+        
+        # Add AM/PM if not present
+        if 'am' in time_part.lower() or 'pm' in time_part.lower():
+            period = 'AM' if 'am' in time_part.lower() else 'PM'
+            if ':' in start_time and 'M' not in start_time:
+                start_time += f' {period}'
+            if ':' in end_time and 'M' not in end_time:
+                end_time += f' {period}'
+        
+        return start_time, end_time
+    
+    return None
+
+def parse_days_string(schedule_str):
+    """Parse days from string like 'M,W,F 10:40-11:30am'"""
+    if not schedule_str or str(schedule_str).lower() == 'n/a':
+        return []
+    
+    days_map = {
+        'M': 'Monday',
+        'T': 'Tuesday', 
+        'W': 'Wednesday',
+        'R': 'Thursday',
+        'F': 'Friday',
+        'S': 'Saturday',
+        'U': 'Sunday'
+    }
+    
+    days = []
+    for abbr, full_name in days_map.items():
+        if abbr in schedule_str.upper():
+            days.append(full_name)
+    
+    return days
+
+def parse_excel_course_file(file):
+    """Parse the Excel file with the specified format"""
     try:
-        if file.type == "application/pdf":
-            pdf_reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-            return text
-        elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            doc = docx.Document(file)
-            text = ""
-            for paragraph in doc.paragraphs:
-                text += paragraph.text + "\n"
-            return text
-        else:
-            return str(file.read(), "utf-8")
-    except:
-        return ""
-
-def parse_class_schedule(text):
-    """Extract class schedule from syllabus"""
-    class_times = []
-    
-    # Patterns to find class times
-    time_patterns = [
-        r'([A-Z][a-z]+(?:day)?)\s*,?\s*([A-Z][a-z]+(?:day)?)\s*,?\s*([A-Z][a-z]+(?:day)?)?\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
-        r'([A-Z][a-z]+(?:day)?)\s*&?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
-        r'([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
-        r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*,?\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?'
-    ]
-    
-    for pattern in time_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            # Process the match to extract days and times
-            days = [day for day in match if day and day.lower() in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']]
-            times = [time for time in match if ':' in time]
-            
-            if len(times) >= 2:
-                start_time = times[0]
-                end_time = times[1]
+        # Read the Excel file
+        workbook = openpyxl.load_workbook(file)
+        courses = []
+        
+        # Process each sheet (each course)
+        for sheet_name in workbook.sheetnames:
+            if sheet_name.startswith('Course'):
+                sheet = workbook[sheet_name]
+                course_data = {}
+                assignments = []
                 
-                # Normalize day names
-                normalized_days = []
-                for day in days:
-                    day_lower = day.lower()
-                    if day_lower in ['monday', 'mon']:
-                        normalized_days.append('Monday')
-                    elif day_lower in ['tuesday', 'tue']:
-                        normalized_days.append('Tuesday')
-                    elif day_lower in ['wednesday', 'wed']:
-                        normalized_days.append('Wednesday')
-                    elif day_lower in ['thursday', 'thu']:
-                        normalized_days.append('Thursday')
-                    elif day_lower in ['friday', 'fri']:
-                        normalized_days.append('Friday')
-                    elif day_lower in ['saturday', 'sat']:
-                        normalized_days.append('Saturday')
-                    elif day_lower in ['sunday', 'sun']:
-                        normalized_days.append('Sunday')
+                # Read course information
+                for row in sheet.iter_rows(min_row=1, max_row=20, min_col=1, max_col=2):
+                    if row[0].value and row[1].value:
+                        field = str(row[0].value).strip()
+                        value = str(row[1].value).strip()
+                        
+                        if 'Course title' in field:
+                            course_data['name'] = value
+                        elif 'Course Lecture Schedule' in field:
+                            course_data['lecture_schedule'] = value
+                        elif 'Lecture location' in field:
+                            course_data['lecture_location'] = value
+                        elif 'When in lab' in field:
+                            course_data['lab_schedule'] = value
+                        elif 'Where is lab' in field:
+                            course_data['lab_location'] = value
+                        elif 'When is recitation' in field:
+                            course_data['recitation_schedule'] = value
+                        elif 'Where is recitation' in field:
+                            course_data['recitation_location'] = value
+                        elif 'Suggested daily study time' in field:
+                            course_data['daily_study_time'] = value
                 
-                if normalized_days:
-                    class_times.append({
-                        'days': normalized_days,
-                        'start_time': start_time,
-                        'end_time': end_time,
-                        'type': 'Lecture'
-                    })
-    
-    # Look for lab times
-    lab_patterns = [
-        r'[Ll]ab\s*:?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?',
-        r'[Ll]aboratory\s*:?\s*([A-Z][a-z]+(?:day)?)\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?'
-    ]
-    
-    for pattern in lab_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            day = match[0]
-            start_time = match[1]
-            end_time = match[2]
-            
-            # Normalize day name
-            day_lower = day.lower()
-            if day_lower in ['monday', 'mon']:
-                normalized_day = 'Monday'
-            elif day_lower in ['tuesday', 'tue']:
-                normalized_day = 'Tuesday'
-            elif day_lower in ['wednesday', 'wed']:
-                normalized_day = 'Wednesday'
-            elif day_lower in ['thursday', 'thu']:
-                normalized_day = 'Thursday'
-            elif day_lower in ['friday', 'fri']:
-                normalized_day = 'Friday'
-            elif day_lower in ['saturday', 'sat']:
-                normalized_day = 'Saturday'
-            elif day_lower in ['sunday', 'sun']:
-                normalized_day = 'Sunday'
-            else:
-                continue
-                
-            class_times.append({
-                'days': [normalized_day],
-                'start_time': start_time,
-                'end_time': end_time,
-                'type': 'Lab'
-            })
-    
-    return class_times
-
-def parse_single_syllabus(text, course_code_hint=None):
-    """Parse a single syllabus for ONE specific course"""
-    assignments = []
-    course_info = {}
-    
-    # Try to extract course code and name
-    course_patterns = [
-        r'([A-Z]{2,4}[- ]?\d{3,4}[A-Z]?)\s*[-:]?\s*([^:\n]{10,80})',
-        r'Course:\s*([A-Z]{2,4}[- ]?\d{3,4}[A-Z]?)\s*[-:]?\s*([^:\n]+)',
-        r'([A-Z]{2,4}\s+\d{3,4})\s*[-:]?\s*([^:\n]+)',
-    ]
-    
-    course_found = False
-    for pattern in course_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            code = matches[0][0].strip().upper().replace(' ', '')
-            name = matches[0][1].strip()
-            course_info = {
-                'code': code,
-                'name': name
-            }
-            course_found = True
-            break
-    
-    # If no course found, use hint or create default
-    if not course_found:
-        if course_code_hint:
-            course_info = {
-                'code': course_code_hint,
-                'name': f'{course_code_hint} Course'
-            }
-        else:
-            course_info = {
-                'code': 'COURSE101',
-                'name': 'Course'
-            }
-    
-    # Extract class schedule
-    class_schedule = parse_class_schedule(text)
-    course_info['class_schedule'] = class_schedule
-    
-    # Extract assignments/deadlines
-    date_patterns = [
-        r'(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s*[-:]?\s*([^:\n]{10,100})',
-        r'([A-Z][a-z]+\s+\d{1,2})\s*[-:]?\s*([^:\n]{10,100})',
-        r'(Week\s+\d+)\s*[-:]?\s*([^:\n]{10,100})',
-    ]
-    
-    for pattern in date_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            date_str = match[0].strip()
-            title = match[1].strip()
-            
-            # Skip if it looks like a course code
-            if re.match(r'^[A-Z]{2,4}[- ]?\d{3,4}', title):
-                continue
-                
-            # Try to parse date
-            try:
-                # Handle different date formats
-                if '/' in date_str or '-' in date_str:
-                    # Try to parse as date
-                    for fmt in ['%m/%d/%Y', '%m-%d-%Y', '%m/%d/%y', '%m-%d-%y']:
-                        try:
-                            parsed_date = datetime.strptime(date_str, fmt)
-                            formatted_date = parsed_date.strftime('%Y-%m-%d')
-                            break
-                        except:
-                            continue
+                # Generate course code from name if not provided
+                if 'name' in course_data:
+                    # Try to extract course code from name
+                    code_match = re.search(r'([A-Z]{2,4})\s*(\d{3,4})', course_data['name'].upper())
+                    if code_match:
+                        course_data['code'] = f"{code_match.group(1)}{code_match.group(2)}"
                     else:
-                        # Default to future date
-                        formatted_date = (datetime.now() + timedelta(days=random.randint(7, 60))).strftime('%Y-%m-%d')
-                else:
-                    # Default to future date
-                    formatted_date = (datetime.now() + timedelta(days=random.randint(7, 60))).strftime('%Y-%m-%d')
+                        course_data['code'] = course_data['name'].replace(' ', '')[:8]
                 
-                assignment_type = 'assignment'
-                if any(word in title.lower() for word in ['exam', 'test', 'quiz', 'midterm', 'final']):
-                    assignment_type = 'exam'
-                elif any(word in title.lower() for word in ['lab', 'practical']):
-                    assignment_type = 'lab'
-                elif any(word in title.lower() for word in ['project', 'presentation']):
-                    assignment_type = 'project'
+                # Parse class schedules
+                class_schedule = []
                 
-                assignments.append({
-                    'id': str(uuid.uuid4()),
-                    'title': title,
-                    'date': formatted_date,
-                    'type': assignment_type,
-                    'course': course_info['code'],
-                    'priority': 'high' if assignment_type == 'exam' else 'medium'
-                })
-            except:
-                continue
+                # Lecture schedule
+                if 'lecture_schedule' in course_data and course_data['lecture_schedule'].lower() != 'n/a':
+                    days = parse_days_string(course_data['lecture_schedule'])
+                    times = parse_time_string(course_data['lecture_schedule'])
+                    if days and times:
+                        class_schedule.append({
+                            'days': days,
+                            'start_time': times[0],
+                            'end_time': times[1],
+                            'type': 'Lecture',
+                            'location': course_data.get('lecture_location', '')
+                        })
+                
+                # Lab schedule
+                if 'lab_schedule' in course_data and course_data['lab_schedule'].lower() != 'n/a':
+                    days = parse_days_string(course_data['lab_schedule'])
+                    times = parse_time_string(course_data['lab_schedule'])
+                    if days and times:
+                        class_schedule.append({
+                            'days': days,
+                            'start_time': times[0],
+                            'end_time': times[1],
+                            'type': 'Lab',
+                            'location': course_data.get('lab_location', '')
+                        })
+                
+                # Recitation schedule
+                if 'recitation_schedule' in course_data and course_data['recitation_schedule'].lower() != 'n/a':
+                    days = parse_days_string(course_data['recitation_schedule'])
+                    times = parse_time_string(course_data['recitation_schedule'])
+                    if days and times:
+                        class_schedule.append({
+                            'days': days,
+                            'start_time': times[0],
+                            'end_time': times[1],
+                            'type': 'Recitation',
+                            'location': course_data.get('recitation_location', '')
+                        })
+                
+                course_data['class_schedule'] = class_schedule
+                
+                # Read assignments (look for rows with "Large Assignment" or "Exam")
+                for row in sheet.iter_rows(min_row=15, max_row=30, min_col=1, max_col=3):
+                    if row[0].value and row[1].value:
+                        assignment_name = str(row[0].value).strip()
+                        assignment_type = str(row[1].value).strip()
+                        due_date = str(row[2].value).strip() if row[2].value else ""
+                        
+                        if 'Large Assignment' in assignment_name or 'Exam' in assignment_type:
+                            assignments.append({
+                                'id': str(uuid.uuid4()),
+                                'title': assignment_type,
+                                'date': due_date,
+                                'type': 'exam' if 'Exam' in assignment_type else 'assignment',
+                                'course': course_data.get('code', 'UNKNOWN'),
+                                'priority': 'high' if 'Exam' in assignment_type else 'medium'
+                            })
+                
+                course_data['assignments'] = assignments
+                courses.append(course_data)
+        
+        return courses
     
-    return course_info, assignments
+    except Exception as e:
+        st.error(f"Error reading Excel file: {str(e)}")
+        return []
 
 def generate_time_slots():
     """Generate 30-minute time slots"""
@@ -660,7 +574,7 @@ def time_to_slot_index(time_str):
                 return i
         return 0
 
-def generate_weekly_schedule(courses, assignments, intramurals, preferences):
+def generate_weekly_schedule(courses, intramurals, preferences):
     """Generate a structured weekly schedule with 30-minute increments"""
     schedule = {}
     time_slots = generate_time_slots()
@@ -682,12 +596,6 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
             wake_time = preferences.get('wake_time', 8)
             bedtime = preferences.get('bedtime', 11)
             
-            # Add bedtime (handle PM times)
-            if bedtime >= 10:
-                bedtime_str = f"{bedtime}:00 PM"
-            else:
-                bedtime_str = f"{bedtime + 12}:00 AM"
-            
             # Fill sleep times
             for time_slot in time_slots:
                 hour = int(time_slot.split(':')[0])
@@ -703,7 +611,7 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
                 if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
                     daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep"}
             
-            # Add class times
+            # Add class times from Excel data
             for course in courses:
                 if 'class_schedule' in course:
                     for class_time in course['class_schedule']:
@@ -711,16 +619,44 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
                             start_time = class_time['start_time']
                             end_time = class_time['end_time']
                             class_type = class_time['type']
+                            location = class_time.get('location', '')
                             
-                            # Convert to proper format and find slots
+                            # Convert times and fill schedule
                             try:
-                                start_slot = time_to_slot_index(start_time)
-                                end_slot = time_to_slot_index(end_time)
+                                # Parse start and end times
+                                start_hour = int(start_time.split(':')[0])
+                                start_min = int(start_time.split(':')[1].split()[0])
+                                if 'PM' in start_time and start_hour != 12:
+                                    start_hour += 12
+                                elif 'AM' in start_time and start_hour == 12:
+                                    start_hour = 0
                                 
-                                for i in range(start_slot, min(end_slot, len(time_slots))):
-                                    if i < len(time_slots):
-                                        daily_schedule[time_slots[i]] = {
-                                            "activity": f"{course['code']} - {class_type}",
+                                end_hour = int(end_time.split(':')[0])
+                                end_min = int(end_time.split(':')[1].split()[0])
+                                if 'PM' in end_time and end_hour != 12:
+                                    end_hour += 12
+                                elif 'AM' in end_time and end_hour == 12:
+                                    end_hour = 0
+                                
+                                # Find corresponding time slots
+                                for time_slot in time_slots:
+                                    slot_hour = int(time_slot.split(':')[0])
+                                    slot_min = int(time_slot.split(':')[1].split()[0])
+                                    if 'PM' in time_slot and slot_hour != 12:
+                                        slot_hour += 12
+                                    elif 'AM' in time_slot and slot_hour == 12:
+                                        slot_hour = 0
+                                    
+                                    slot_time = slot_hour * 60 + slot_min
+                                    start_time_min = start_hour * 60 + start_min
+                                    end_time_min = end_hour * 60 + end_min
+                                    
+                                    if start_time_min <= slot_time < end_time_min:
+                                        activity_name = f"{course['code']} - {class_type}"
+                                        if location:
+                                            activity_name += f" ({location})"
+                                        daily_schedule[time_slot] = {
+                                            "activity": activity_name,
                                             "type": "class"
                                         }
                             except:
@@ -756,7 +692,7 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
                 if meal_time in daily_schedule:
                     daily_schedule[meal_time] = {"activity": meal_name, "type": "meal"}
             
-            # Add study sessions (avoid class times and meals)
+            # Add study sessions based on course recommendations
             if not is_weekend:
                 study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
             else:
@@ -779,31 +715,6 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
                 if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
                     daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break"}
             
-            # Check for upcoming deadlines and add extra study time
-            upcoming_deadlines = []
-            for assignment in assignments:
-                try:
-                    deadline_date = datetime.strptime(assignment['date'], '%Y-%m-%d')
-                    current_date = datetime.now() + timedelta(days=week*7 + ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index(day))
-                    days_until = (deadline_date - current_date).days
-                    
-                    if 0 <= days_until <= 7:  # Deadline within a week
-                        upcoming_deadlines.append(assignment)
-                except:
-                    continue
-            
-            # Add extra study time for upcoming deadlines
-            if upcoming_deadlines:
-                for deadline in upcoming_deadlines:
-                    # Find a free slot and add focused study time
-                    for time_slot in ["9:00 AM", "1:00 PM", "8:00 PM"]:
-                        if time_slot in daily_schedule and daily_schedule[time_slot]["type"] == "free":
-                            daily_schedule[time_slot] = {
-                                "activity": f"{deadline['course']} - {deadline['type'].title()} Prep",
-                                "type": "study"
-                            }
-                            break
-            
             weekly_schedule[day] = daily_schedule
         
         schedule[f'week_{week}'] = weekly_schedule
@@ -811,7 +722,7 @@ def generate_weekly_schedule(courses, assignments, intramurals, preferences):
     return schedule
 
 def create_schedule_dataframe(weekly_schedule):
-    """Create a pandas DataFrame for the schedule table with color coding"""
+    """Create a pandas DataFrame for the schedule table"""
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
@@ -958,7 +869,7 @@ def main():
     
     # Step-by-step flow
     if st.session_state.step == 1:
-        show_course_setup()
+        show_excel_upload()
     elif st.session_state.step == 2:
         show_preferences_step()
     elif st.session_state.step == 3:
@@ -966,202 +877,79 @@ def main():
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-def show_course_setup():
-    """Step 1: Individual course setup with class schedule confirmation"""
+def show_excel_upload():
+    """Step 1: Excel file upload and processing"""
     st.markdown("""
     <div class="setup-card">
-        <h2><span class="step-number">1</span>Add Your Courses</h2>
-        <p>Upload each syllabus individually. We'll extract class times and you can confirm or edit them.</p>
+        <h2><span class="step-number">1</span>Upload Your Course Template</h2>
+        <p>Upload the Excel file with your course information, class schedules, and assignments.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Show current courses
+    # Show current courses if any
     if st.session_state.courses:
         st.markdown("### 📚 Your Courses")
-        for i, course in enumerate(st.session_state.courses):
+        for course in st.session_state.courses:
             st.markdown(f"""
             <div class="course-card">
-                <div class="course-code">{course['code']}</div>
-                <div class="course-name">{course['name']}</div>
+                <div class="course-code">{course.get('code', 'Unknown')}</div>
+                <div class="course-name">{course.get('name', 'Unknown Course')}</div>
             </div>
             """, unsafe_allow_html=True)
             
             # Show class schedule
             if 'class_schedule' in course and course['class_schedule']:
-                st.markdown(f"**Class Schedule for {course['code']}:**")
+                st.markdown(f"**Class Schedule for {course.get('code', 'Unknown')}:**")
                 for class_time in course['class_schedule']:
                     days_str = ", ".join(class_time['days'])
+                    location = f" - {class_time['location']}" if class_time.get('location') else ""
                     st.markdown(f"""
                     <div class="class-schedule">
-                        <div class="class-schedule-item">{class_time['type']}: {days_str}, {class_time['start_time']} - {class_time['end_time']}</div>
+                        <div class="class-schedule-item">{class_time['type']}: {days_str}, {class_time['start_time']} - {class_time['end_time']}{location}</div>
                     </div>
                     """, unsafe_allow_html=True)
     
-    # Add new course section
-    st.markdown("### ➕ Add New Course")
+    # File upload section
+    st.markdown("### 📄 Upload Course Template")
     
-    col1, col2 = st.columns([2, 1])
+    # Instructions
+    st.info("""
+    **Template Format Requirements:**
+    - Excel file with separate tabs for each course (Course 1, Course 2, etc.)
+    - Each tab should contain course information, class schedules, and assignment details
+    - Use the format: Course title, lecture schedule, lab schedule, assignments, etc.
+    """)
     
-    with col1:
-        course_code = st.text_input(
-            "Course Code (e.g., BIO1205, MATH101)",
-            placeholder="Enter course code"
-        )
-        
-        uploaded_file = st.file_uploader(
-            "📄 Upload Syllabus",
-            type=['pdf', 'docx', 'txt'],
-            help="Upload the syllabus for this course"
-        )
+    uploaded_file = st.file_uploader(
+        "Choose Excel file",
+        type=['xlsx', 'xls'],
+        help="Upload your course template Excel file"
+    )
     
-    with col2:
-        if st.button("📚 Add Course", disabled=not (course_code and uploaded_file)):
-            if course_code and uploaded_file:
-                with st.spinner(f"🧠 Analyzing syllabus for {course_code}..."):
-                    text = extract_text_from_file(uploaded_file)
-                    course_info, assignments = parse_single_syllabus(text, course_code)
-                    
-                    # Store for confirmation
-                    st.session_state.temp_course = course_info
-                    st.session_state.temp_assignments = assignments
-                    st.session_state.show_confirmation = True
-                    
-                    st.rerun()
-    
-    # Show confirmation dialog
-    if st.session_state.get('show_confirmation', False):
-        st.markdown("### 🔍 Confirm Course Details")
-        
-        temp_course = st.session_state.temp_course
-        
-        # Course info confirmation
-        confirmed_code = st.text_input("Course Code", value=temp_course['code'])
-        confirmed_name = st.text_input("Course Name", value=temp_course['name'])
-        
-        # Class schedule confirmation
-        st.markdown("**Class Schedule (extracted from syllabus):**")
-        
-        if 'class_schedule' in temp_course and temp_course['class_schedule']:
-            for i, class_time in enumerate(temp_course['class_schedule']):
-                st.markdown(f"**{class_time['type']} {i+1}:**")
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    days = st.multiselect(
-                        "Days",
-                        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-                        default=class_time['days'],
-                        key=f"days_{i}"
-                    )
-                
-                with col2:
-                    start_time = st.time_input(
-                        "Start Time",
-                        value=datetime.strptime(class_time['start_time'], '%H:%M').time() if ':' in class_time['start_time'] else time(9, 0),
-                        key=f"start_{i}"
-                    )
-                
-                with col3:
-                    end_time = st.time_input(
-                        "End Time", 
-                        value=datetime.strptime(class_time['end_time'], '%H:%M').time() if ':' in class_time['end_time'] else time(10, 0),
-                        key=f"end_{i}"
-                    )
-                
-                with col4:
-                    class_type = st.selectbox(
-                        "Type",
-                        ["Lecture", "Lab", "Recitation", "Seminar"],
-                        index=0 if class_time['type'] == 'Lecture' else 1,
-                        key=f"type_{i}"
-                    )
-                
-                # Update the class schedule
-                temp_course['class_schedule'][i] = {
-                    'days': days,
-                    'start_time': start_time.strftime('%H:%M'),
-                    'end_time': end_time.strftime('%H:%M'),
-                    'type': class_type
-                }
-        else:
-            st.info("No class schedule found in syllabus. Add manually:")
+    if uploaded_file is not None:
+        with st.spinner("🧠 Processing your course template..."):
+            courses = parse_excel_course_file(uploaded_file)
             
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                days = st.multiselect(
-                    "Days",
-                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-                    key="manual_days"
-                )
-            
-            with col2:
-                start_time = st.time_input("Start Time", value=time(9, 0), key="manual_start")
-            
-            with col3:
-                end_time = st.time_input("End Time", value=time(10, 0), key="manual_end")
-            
-            with col4:
-                class_type = st.selectbox("Type", ["Lecture", "Lab", "Recitation", "Seminar"], key="manual_type")
-            
-            if days:
-                temp_course['class_schedule'] = [{
-                    'days': days,
-                    'start_time': start_time.strftime('%H:%M'),
-                    'end_time': end_time.strftime('%H:%M'),
-                    'type': class_type
-                }]
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("✅ Confirm & Add Course"):
-                temp_course['code'] = confirmed_code
-                temp_course['name'] = confirmed_name
+            if courses:
+                st.session_state.courses = courses
                 
-                st.session_state.courses.append(temp_course)
+                # Create assignments list
+                all_assignments = []
+                for course in courses:
+                    all_assignments.extend(course.get('assignments', []))
+                st.session_state.assignments = all_assignments
                 
-                if 'assignments' not in st.session_state:
-                    st.session_state.assignments = []
-                st.session_state.assignments.extend(st.session_state.temp_assignments)
-                
-                # Clear temp data
-                del st.session_state.temp_course
-                del st.session_state.temp_assignments
-                st.session_state.show_confirmation = False
-                
-                st.success(f"✅ Added {confirmed_code}!")
+                st.success(f"✅ Successfully loaded {len(courses)} courses with {len(all_assignments)} assignments!")
                 st.rerun()
-        
-        with col2:
-            if st.button("❌ Cancel"):
-                del st.session_state.temp_course
-                del st.session_state.temp_assignments
-                st.session_state.show_confirmation = False
-                st.rerun()
-    
-    # Manual course addition
-    with st.expander("➕ Add Course Manually"):
-        manual_code = st.text_input("Course Code", key="manual_code")
-        manual_name = st.text_input("Course Name", key="manual_name")
-        
-        if st.button("Add Manual Course"):
-            if manual_code and manual_name:
-                course_info = {
-                    'code': manual_code,
-                    'name': manual_name,
-                    'class_schedule': []
-                }
-                st.session_state.courses.append(course_info)
-                st.success(f"✅ Added {manual_code} manually!")
-                st.rerun()
+            else:
+                st.error("❌ Could not read course data from the file. Please check the format.")
     
     # Progress and navigation
     st.markdown("""
     <div class="progress-bar">
         <div class="progress-fill" style="width: 33%"></div>
     </div>
-    <p class="progress-text">Step 1 of 3 - Add at least one course to continue</p>
+    <p class="progress-text">Step 1 of 3 - Upload your course template to continue</p>
     """, unsafe_allow_html=True)
     
     if st.session_state.courses:
@@ -1169,10 +957,10 @@ def show_course_setup():
             st.session_state.step = 2
             st.rerun()
     else:
-        st.info("👆 Add at least one course to continue")
+        st.info("👆 Upload your course template Excel file to continue")
 
 def show_preferences_step():
-    """Step 2: Preferences setup with AM/PM sleep scheduler"""
+    """Step 2: Preferences setup"""
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">2</span>Personalize Your Schedule</h2>
@@ -1196,7 +984,6 @@ def show_preferences_step():
         st.write(f"**Bedtime: {bedtime_display}**")
         
         st.markdown("### 📚 Study Preferences")
-        attention_span = st.slider("Study session length (minutes)", 15, 90, 45)
         study_intensity = st.selectbox(
             "Study intensity",
             ["🌿 Light (2-3 sessions/day)", "⚖️ Moderate (3-4 sessions/day)", "🔥 Intensive (4-5 sessions/day)"]
@@ -1275,7 +1062,6 @@ def show_preferences_step():
     preferences = {
         'wake_time': wake_time,
         'bedtime': bedtime_hour,
-        'attention_span': attention_span,
         'study_intensity': study_intensity,
         'include_intramurals': include_intramurals
     }
@@ -1293,7 +1079,7 @@ def show_preferences_step():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("← Back to Courses"):
+        if st.button("← Back to Upload"):
             st.session_state.step = 1
             st.rerun()
     
@@ -1302,7 +1088,6 @@ def show_preferences_step():
             with st.spinner("🎨 Creating your personalized schedule..."):
                 schedule = generate_weekly_schedule(
                     st.session_state.courses,
-                    st.session_state.get('assignments', []),
                     st.session_state.intramurals,
                     preferences
                 )
@@ -1315,7 +1100,7 @@ def show_schedule_step():
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">3</span>Your Color-Coded Schedule</h2>
-        <p>30-minute increments with automatic class times, deadlines, and wellness balance</p>
+        <p>30-minute increments with your actual class times and balanced wellness</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1323,7 +1108,6 @@ def show_schedule_step():
     courses_count = len(st.session_state.courses)
     assignments_count = len(st.session_state.get('assignments', []))
     intramurals_count = len(st.session_state.intramurals)
-    attention_span = st.session_state.user_data.get('attention_span', 45)
     
     st.markdown(f"""
     <div class="stats-grid">
@@ -1340,8 +1124,8 @@ def show_schedule_step():
             <div class="stat-label">Activities</div>
         </div>
         <div class="stat-card">
-            <span class="stat-number">{attention_span}</span>
-            <div class="stat-label">Min Sessions</div>
+            <span class="stat-number">4</span>
+            <div class="stat-label">Weeks</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1457,8 +1241,8 @@ def show_schedule_step():
     st.success(f"""
     🎉 **Your FocusFlow Schedule is Ready!**
     
-    ✅ **{courses_count} courses** with actual class times integrated
-    ✅ **{assignments_count} assignments** with deadline-focused study sessions
+    ✅ **{courses_count} courses** with actual class times from your Excel template
+    ✅ **{assignments_count} assignments** with deadline tracking
     ✅ **{intramurals_count} activities** scheduled with proper duration
     ✅ **30-minute increments** for precise time management
     ✅ **Color-coded activities** for easy visual scanning
