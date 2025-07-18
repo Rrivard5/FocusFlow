@@ -442,28 +442,43 @@ def parse_excel_course_file(file):
                 course_data = {}
                 assignments = []
                 
-                # Read course information (first 20 rows, first 2 columns)
-                for index, row in df.iloc[:20, :2].iterrows():
-                    if pd.notna(row.iloc[0]) and pd.notna(row.iloc[1]):
-                        field = str(row.iloc[0]).strip()
-                        value = str(row.iloc[1]).strip()
-                        
-                        if 'Course title' in field:
-                            course_data['name'] = value
-                        elif 'Course Lecture Schedule' in field:
-                            course_data['lecture_schedule'] = value
-                        elif 'Lecture location' in field:
-                            course_data['lecture_location'] = value
-                        elif 'When in lab' in field:
-                            course_data['lab_schedule'] = value
-                        elif 'Where is lab' in field:
-                            course_data['lab_location'] = value
-                        elif 'When is recitation' in field:
-                            course_data['recitation_schedule'] = value
-                        elif 'Where is recitation' in field:
-                            course_data['recitation_location'] = value
-                        elif 'Suggested daily study time' in field:
-                            course_data['daily_study_time'] = value
+                # Safety check - ensure dataframe has enough rows and columns
+                if df.shape[0] < 5 or df.shape[1] < 2:
+                    st.warning(f"Sheet {sheet_name} appears to be empty or too small. Skipping...")
+                    continue
+                
+                # Read course information (safely iterate through available rows)
+                max_rows = min(20, df.shape[0])  # Don't exceed available rows
+                max_cols = min(2, df.shape[1])   # Don't exceed available columns
+                
+                for index in range(max_rows):
+                    try:
+                        if index < df.shape[0] and df.shape[1] >= 2:
+                            field_val = df.iloc[index, 0]
+                            value_val = df.iloc[index, 1]
+                            
+                            if pd.notna(field_val) and pd.notna(value_val):
+                                field = str(field_val).strip()
+                                value = str(value_val).strip()
+                                
+                                if 'Course title' in field:
+                                    course_data['name'] = value
+                                elif 'Course Lecture Schedule' in field:
+                                    course_data['lecture_schedule'] = value
+                                elif 'Lecture location' in field:
+                                    course_data['lecture_location'] = value
+                                elif 'When in lab' in field:
+                                    course_data['lab_schedule'] = value
+                                elif 'Where is lab' in field:
+                                    course_data['lab_location'] = value
+                                elif 'When is recitation' in field:
+                                    course_data['recitation_schedule'] = value
+                                elif 'Where is recitation' in field:
+                                    course_data['recitation_location'] = value
+                                elif 'Suggested daily study time' in field:
+                                    course_data['daily_study_time'] = value
+                    except (IndexError, KeyError):
+                        continue
                 
                 # Generate course code from name if not provided
                 if 'name' in course_data:
@@ -523,25 +538,39 @@ def parse_excel_course_file(file):
                 
                 course_data['class_schedule'] = class_schedule
                 
-                # Read assignments (look for rows with "Large Assignment" or "Exam" in rows 15-30)
-                for index, row in df.iloc[14:30, :3].iterrows():
-                    if pd.notna(row.iloc[0]) and pd.notna(row.iloc[1]):
-                        assignment_name = str(row.iloc[0]).strip()
-                        assignment_type = str(row.iloc[1]).strip()
-                        due_date = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ""
-                        
-                        if 'Large Assignment' in assignment_name or 'Exam' in assignment_type:
-                            assignments.append({
-                                'id': str(uuid.uuid4()),
-                                'title': assignment_type,
-                                'date': due_date,
-                                'type': 'exam' if 'Exam' in assignment_type else 'assignment',
-                                'course': course_data.get('code', 'UNKNOWN'),
-                                'priority': 'high' if 'Exam' in assignment_type else 'medium'
-                            })
+                # Read assignments (safely look for assignment rows)
+                assignment_start_row = 14
+                assignment_end_row = min(30, df.shape[0])
+                
+                for index in range(assignment_start_row, assignment_end_row):
+                    try:
+                        if index < df.shape[0] and df.shape[1] >= 2:
+                            assignment_name_val = df.iloc[index, 0]
+                            assignment_type_val = df.iloc[index, 1]
+                            due_date_val = df.iloc[index, 2] if df.shape[1] >= 3 else ""
+                            
+                            if pd.notna(assignment_name_val) and pd.notna(assignment_type_val):
+                                assignment_name = str(assignment_name_val).strip()
+                                assignment_type = str(assignment_type_val).strip()
+                                due_date = str(due_date_val).strip() if pd.notna(due_date_val) else ""
+                                
+                                if 'Large Assignment' in assignment_name or 'Exam' in assignment_type:
+                                    assignments.append({
+                                        'id': str(uuid.uuid4()),
+                                        'title': assignment_type,
+                                        'date': due_date,
+                                        'type': 'exam' if 'Exam' in assignment_type else 'assignment',
+                                        'course': course_data.get('code', 'UNKNOWN'),
+                                        'priority': 'high' if 'Exam' in assignment_type else 'medium'
+                                    })
+                    except (IndexError, KeyError):
+                        continue
                 
                 course_data['assignments'] = assignments
-                courses.append(course_data)
+                
+                # Only add course if we got some basic info
+                if 'name' in course_data or 'code' in course_data:
+                    courses.append(course_data)
         
         return courses
     
