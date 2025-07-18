@@ -310,6 +310,14 @@ st.markdown("""
         padding: 0.75rem 1rem !important;
     }
     
+    .stSelectbox > div > div > div {
+        color: #000000 !important;
+    }
+    
+    .stSelectbox div[data-baseweb="select"] > div {
+        color: #000000 !important;
+    }
+    
     .stTextInput > div > div > input {
         background: rgba(255, 255, 255, 0.95) !important;
         border: 2px solid rgba(255, 255, 255, 0.3) !important;
@@ -694,7 +702,7 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                             class_type = class_time['type']
                             location = class_time.get('location', '')
                             
-                            # Convert times and fill schedule
+                            # Convert times and fill schedule with proper rounding
                             try:
                                 # Parse start and end times
                                 start_hour = int(start_time.split(':')[0])
@@ -710,6 +718,19 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                     end_hour += 12
                                 elif 'AM' in end_time and end_hour == 12:
                                     end_hour = 0
+                                
+                                # Round down start time to nearest 30 minutes (start earlier)
+                                if start_min > 0 and start_min <= 30:
+                                    start_min = 0  # Round down to :00
+                                elif start_min > 30:
+                                    start_min = 30  # Round down to :30
+                                
+                                # Round up end time to nearest 30 minutes (end later)
+                                if end_min > 0 and end_min <= 30:
+                                    end_min = 30  # Round up to :30
+                                elif end_min > 30:
+                                    end_min = 0
+                                    end_hour += 1  # Round up to next hour
                                 
                                 # Find corresponding time slots
                                 for time_slot in time_slots:
@@ -1215,7 +1236,7 @@ def show_preferences_step():
         if include_intramurals:
             st.markdown("**Add Your Activities:**")
             activity_name = st.text_input("Activity Name (e.g., Soccer, Basketball)", key="activity_name")
-            activity_type = st.selectbox("Activity Type", ["Practice", "Game", "Workout", "Club Meeting"], key="activity_type")
+            activity_type = st.selectbox("Activity Type", ["Practice", "Game", "Workout", "Club Meeting", "Other"], key="activity_type")
             
             # Activity scheduling
             is_scheduled = st.checkbox("Has specific schedule?", value=False, key="is_scheduled")
