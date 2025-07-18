@@ -20,13 +20,13 @@ import base64
 
 # Page config
 st.set_page_config(
-    page_title="StudyFlow",
-    page_icon="⚡",
+    page_title="FocusFlow",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced CSS with weekly table styling
+# Enhanced CSS with compact header and better readability
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -42,210 +42,248 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px);
         border-radius: 24px;
-        padding: 2rem;
-        margin: 1rem;
+        padding: 1.5rem;
+        margin: 0.5rem;
         box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    .hero-section {
+    .compact-hero {
         text-align: center;
-        padding: 4rem 2rem;
+        padding: 1.5rem;
         background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
-        border-radius: 20px;
-        margin-bottom: 2rem;
+        border-radius: 16px;
+        margin-bottom: 1.5rem;
         color: #ffffff;
-        position: relative;
-        overflow: hidden;
     }
     
-    .hero-title {
-        font-size: 3.5rem;
+    .compact-hero h1 {
+        font-size: 2.2rem;
         font-weight: 700;
-        margin-bottom: 1rem;
+        margin: 0;
         text-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
     
-    .hero-subtitle {
-        font-size: 1.3rem;
-        font-weight: 400;
-        opacity: 0.95;
+    .compact-hero p {
+        font-size: 1rem;
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
     }
     
     .setup-card {
         background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(15px);
         border-radius: 16px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        transition: all 0.3s ease;
-        color: #ffffff;
-    }
-    
-    .step-number {
-        display: inline-block;
-        width: 45px;
-        height: 45px;
-        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
-        color: white;
-        border-radius: 50%;
-        text-align: center;
-        line-height: 45px;
-        font-weight: 600;
-        margin-right: 15px;
-        font-size: 1.1rem;
-        box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
-    }
-    
-    .course-card {
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
         padding: 1.5rem;
         margin: 1rem 0;
         border: 1px solid rgba(255, 255, 255, 0.15);
         color: #ffffff;
     }
     
-    .course-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
+    .step-number {
+        display: inline-block;
+        width: 35px;
+        height: 35px;
+        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 35px;
+        font-weight: 600;
+        margin-right: 12px;
+        font-size: 1rem;
+        box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+    }
+    
+    .course-card {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 0.75rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #ffffff;
     }
     
     .course-code {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         font-weight: 600;
         color: #6c5ce7;
+        margin-bottom: 0.5rem;
     }
     
     .course-name {
-        font-size: 1rem;
-        color: rgba(255, 255, 255, 0.9);
-        margin: 0.5rem 0;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.85);
     }
     
-    .weekly-table {
+    .intramural-card {
+        background: rgba(0, 184, 148, 0.1);
+        border: 1px solid rgba(0, 184, 148, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        color: #ffffff;
+    }
+    
+    .intramural-card h4 {
+        color: #00b894;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+    }
+    
+    .activity-item {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-left: 3px solid #00b894;
+    }
+    
+    .wellness-info {
+        background: rgba(253, 203, 110, 0.1);
+        border: 1px solid rgba(253, 203, 110, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        color: #ffffff;
+    }
+    
+    .wellness-info h4 {
+        color: #fdcb6e;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .wellness-info p {
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+    }
+    
+    .schedule-table {
         width: 100%;
         border-collapse: collapse;
         background: rgba(255, 255, 255, 0.08);
         border-radius: 16px;
         overflow: hidden;
-        margin: 2rem 0;
+        margin: 1.5rem 0;
+        font-size: 0.9rem;
     }
     
-    .weekly-table th {
+    .schedule-table th {
         background: linear-gradient(135deg, #6c5ce7, #a29bfe);
         color: white;
-        padding: 1rem;
+        padding: 0.75rem 0.5rem;
         text-align: center;
         font-weight: 600;
-        font-size: 1.1rem;
+        font-size: 0.95rem;
     }
     
-    .weekly-table td {
-        padding: 0.75rem;
+    .schedule-table td {
+        padding: 0.5rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         vertical-align: top;
-        min-height: 60px;
         background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.85rem;
+        line-height: 1.3;
     }
     
     .time-slot {
         font-weight: 600;
         color: #6c5ce7;
-        min-width: 80px;
+        min-width: 70px;
         text-align: center;
         background: rgba(108, 92, 231, 0.1);
         border-right: 2px solid rgba(108, 92, 231, 0.3);
+        font-size: 0.8rem;
     }
     
-    .activity-cell {
-        font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.9);
-        line-height: 1.3;
-    }
-    
-    .study-activity {
-        background: rgba(108, 92, 231, 0.2);
-        border-left: 3px solid #6c5ce7;
-        padding: 0.25rem 0.5rem;
+    .study-block {
+        background: rgba(108, 92, 231, 0.3);
         border-radius: 4px;
+        padding: 0.25rem;
         margin: 0.1rem 0;
+        font-weight: 500;
+        color: white;
+        text-align: center;
     }
     
-    .meal-activity {
-        background: rgba(253, 203, 110, 0.2);
-        border-left: 3px solid #fdcb6e;
-        padding: 0.25rem 0.5rem;
+    .meal-block {
+        background: rgba(253, 203, 110, 0.3);
         border-radius: 4px;
+        padding: 0.25rem;
         margin: 0.1rem 0;
+        font-weight: 500;
+        color: white;
+        text-align: center;
     }
     
-    .free-activity {
-        background: rgba(0, 184, 148, 0.2);
-        border-left: 3px solid #00b894;
-        padding: 0.25rem 0.5rem;
+    .free-block {
+        background: rgba(0, 184, 148, 0.3);
         border-radius: 4px;
+        padding: 0.25rem;
         margin: 0.1rem 0;
+        font-weight: 500;
+        color: white;
+        text-align: center;
     }
     
-    .break-activity {
-        background: rgba(253, 121, 168, 0.2);
-        border-left: 3px solid #fd79a8;
-        padding: 0.25rem 0.5rem;
+    .intramural-block {
+        background: rgba(230, 126, 34, 0.3);
         border-radius: 4px;
+        padding: 0.25rem;
         margin: 0.1rem 0;
+        font-weight: 500;
+        color: white;
+        text-align: center;
     }
     
-    .deadline-activity {
-        background: rgba(231, 76, 60, 0.2);
-        border-left: 3px solid #e74c3c;
-        padding: 0.25rem 0.5rem;
+    .break-block {
+        background: rgba(253, 121, 168, 0.3);
         border-radius: 4px;
+        padding: 0.25rem;
         margin: 0.1rem 0;
-        font-weight: 600;
+        font-weight: 500;
+        color: white;
+        text-align: center;
     }
     
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 1.5rem;
-        margin: 2rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
     }
     
     .stat-card {
         background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(15px);
-        padding: 2rem;
-        border-radius: 16px;
+        padding: 1.5rem;
+        border-radius: 12px;
         text-align: center;
         border: 1px solid rgba(255, 255, 255, 0.15);
-        transition: all 0.3s ease;
     }
     
     .stat-number {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: #6c5ce7;
         display: block;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
     
     .stat-label {
-        font-size: 1rem;
-        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
         margin-top: 0.5rem;
-        font-weight: 500;
     }
     
     .progress-bar {
-        height: 8px;
+        height: 6px;
         background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
+        border-radius: 3px;
         overflow: hidden;
-        margin: 1.5rem 0;
+        margin: 1rem 0;
     }
     
     .progress-fill {
@@ -256,10 +294,47 @@ st.markdown("""
     
     .progress-text {
         text-align: center;
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 1rem;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
+    }
+    
+    .legend {
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
         margin: 1rem 0;
-        font-weight: 500;
+        flex-wrap: wrap;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .legend-color {
+        width: 16px;
+        height: 10px;
+        border-radius: 2px;
+    }
+    
+    .week-nav {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    
+    .week-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #6c5ce7;
+        min-width: 150px;
+        text-align: center;
     }
     
     /* Button styling */
@@ -268,7 +343,7 @@ st.markdown("""
         border-radius: 50px !important;
         padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
         font-family: 'Inter', sans-serif !important;
         transition: all 0.3s ease !important;
         width: 100% !important;
@@ -287,7 +362,7 @@ st.markdown("""
         border-radius: 50px !important;
         padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
         font-family: 'Inter', sans-serif !important;
         transition: all 0.3s ease !important;
         width: 100% !important;
@@ -301,7 +376,15 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4) !important;
     }
     
-    /* Form styling */
+    /* Form styling with better readability */
+    .stSelectbox label, .stTextInput label, .stSlider label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        font-family: 'Inter', sans-serif !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
     .stSelectbox > div > div {
         background: rgba(255, 255, 255, 0.95) !important;
         border: 2px solid rgba(200, 200, 200, 0.5) !important;
@@ -329,92 +412,43 @@ st.markdown("""
         color: #ffffff !important;
         font-family: 'Inter', sans-serif !important;
         font-weight: 500 !important;
-        padding: 2rem !important;
+        padding: 1.5rem !important;
         text-align: center !important;
     }
     
-    .legend {
-        display: flex;
-        justify-content: center;
-        gap: 2rem;
-        margin: 1rem 0;
-        flex-wrap: wrap;
-    }
-    
-    .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.9);
-    }
-    
-    .legend-color {
-        width: 20px;
-        height: 12px;
-        border-radius: 3px;
-        border-left: 3px solid;
-    }
-    
-    .week-navigation {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 1rem;
-        margin: 2rem 0;
-    }
-    
-    .week-nav-btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 25px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-family: 'Inter', sans-serif;
-        font-weight: 500;
-    }
-    
-    .week-nav-btn:hover {
-        background: rgba(108, 92, 231, 0.3);
-        border-color: #6c5ce7;
-    }
-    
-    .current-week {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #6c5ce7;
-        text-align: center;
-        min-width: 200px;
+    .stFileUploader label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        font-family: 'Inter', sans-serif !important;
     }
     
     @media (max-width: 768px) {
-        .hero-title {
-            font-size: 2.5rem;
+        .compact-hero h1 {
+            font-size: 1.8rem;
         }
         
         .main-container {
-            margin: 0.5rem;
+            margin: 0.25rem;
             padding: 1rem;
         }
         
-        .weekly-table {
+        .schedule-table {
             font-size: 0.8rem;
         }
         
-        .weekly-table th, .weekly-table td {
-            padding: 0.5rem;
+        .schedule-table th, .schedule-table td {
+            padding: 0.4rem 0.3rem;
         }
         
         .legend {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
         }
         
-        .week-navigation {
+        .week-nav {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
         }
     }
 </style>
@@ -425,6 +459,8 @@ if 'step' not in st.session_state:
     st.session_state.step = 1
 if 'courses' not in st.session_state:
     st.session_state.courses = []
+if 'intramurals' not in st.session_state:
+    st.session_state.intramurals = []
 if 'current_week' not in st.session_state:
     st.session_state.current_week = 0
 if 'user_data' not in st.session_state:
@@ -474,9 +510,7 @@ def parse_single_syllabus(text, course_code_hint=None):
             name = matches[0][1].strip()
             course_info = {
                 'code': code,
-                'name': name,
-                'difficulty': random.randint(3, 5),
-                'credits': random.randint(3, 4)
+                'name': name
             }
             course_found = True
             break
@@ -486,16 +520,12 @@ def parse_single_syllabus(text, course_code_hint=None):
         if course_code_hint:
             course_info = {
                 'code': course_code_hint,
-                'name': f'{course_code_hint} Course',
-                'difficulty': 4,
-                'credits': 3
+                'name': f'{course_code_hint} Course'
             }
         else:
             course_info = {
                 'code': 'COURSE101',
-                'name': 'Course',
-                'difficulty': 4,
-                'credits': 3
+                'name': 'Course'
             }
     
     # Extract assignments/deadlines
@@ -555,15 +585,15 @@ def parse_single_syllabus(text, course_code_hint=None):
     
     return course_info, assignments
 
-def generate_weekly_schedule(courses, assignments, preferences):
-    """Generate a structured weekly schedule"""
+def generate_weekly_schedule(courses, assignments, intramurals, preferences):
+    """Generate a structured weekly schedule with readable activities"""
     schedule = {}
     
-    # Time slots for the weekly table
+    # Time slots for the schedule
     time_slots = [
-        "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM",
-        "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
+        "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
+        "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
     ]
     
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -579,78 +609,74 @@ def generate_weekly_schedule(courses, assignments, preferences):
             for time_slot in time_slots:
                 activities = []
                 
-                # Morning routine
-                if time_slot == "8:00 AM":
-                    activities.append({
-                        'activity': '🌅 Morning Routine',
-                        'type': 'routine',
-                        'duration': 60
-                    })
+                # Wake up routine
+                if time_slot == "7:00 AM":
+                    activities.append("Wake Up & Morning Routine")
                 
-                # Meals
-                elif time_slot == "12:00 PM":
-                    activities.append({
-                        'activity': '🍽️ Lunch',
-                        'type': 'meal',
-                        'duration': 60
-                    })
-                elif time_slot == "6:00 PM":
-                    activities.append({
-                        'activity': '🍕 Dinner',
-                        'type': 'meal',
-                        'duration': 60
-                    })
+                # Breakfast
+                elif time_slot == "8:00 AM":
+                    activities.append("Breakfast")
                 
-                # Study sessions
-                elif time_slot in ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"] and not is_weekend:
+                # Study blocks (weekdays)
+                elif time_slot in ["9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"] and not is_weekend:
                     if courses:
                         course = random.choice(courses)
-                        study_types = ['Reading', 'Practice', 'Review', 'Problems', 'Notes']
+                        study_types = ['Reading', 'Practice Problems', 'Review Notes', 'Homework', 'Study Group']
                         study_type = random.choice(study_types)
-                        activities.append({
-                            'activity': f'📚 {course["code"]} - {study_type}',
-                            'type': 'study',
-                            'course': course['code'],
-                            'duration': preferences.get('attention_span', 45)
-                        })
+                        activities.append(f"{course['code']} - {study_type}")
                 
-                # Weekend study (lighter)
+                # Light study on weekends
                 elif time_slot in ["10:00 AM", "2:00 PM"] and is_weekend:
-                    if courses and random.random() < 0.6:  # 60% chance
+                    if courses and random.random() < 0.5:  # 50% chance
                         course = random.choice(courses)
-                        activities.append({
-                            'activity': f'📚 {course["code"]} - Review',
-                            'type': 'study',
-                            'course': course['code'],
-                            'duration': preferences.get('attention_span', 45)
-                        })
+                        activities.append(f"{course['code']} - Light Review")
                 
-                # Breaks
-                elif time_slot in ["11:00 AM", "3:00 PM", "5:00 PM"]:
-                    if preferences.get('include_breaks', True):
-                        activities.append({
-                            'activity': '📱 Break',
-                            'type': 'break',
-                            'duration': 15
-                        })
+                # Lunch
+                elif time_slot == "12:00 PM":
+                    activities.append("Lunch Break")
                 
-                # Evening activities
-                elif time_slot in ["8:00 PM", "9:00 PM", "10:00 PM"]:
-                    if is_weekend:
-                        activities.append({
-                            'activity': '🎉 Social Time',
-                            'type': 'free',
-                            'duration': 120
-                        })
+                # Short breaks
+                elif time_slot in ["11:00 AM", "4:00 PM"]:
+                    activities.append("Break / Walk")
+                
+                # Intramural activities
+                elif time_slot == "5:00 PM" and intramurals:
+                    for intramural in intramurals:
+                        if intramural.get('scheduled'):
+                            if day in intramural.get('days', []):
+                                activities.append(f"{intramural['name']} - {intramural['type']}")
+                                break
                     else:
-                        free_activities = ['🎮 Gaming', '📺 Netflix', '📖 Reading', '🎵 Music', '💭 Relaxation']
-                        activities.append({
-                            'activity': random.choice(free_activities),
-                            'type': 'free',
-                            'duration': 60
-                        })
+                        if not is_weekend:
+                            activities.append("Exercise / Intramural Time")
                 
-                daily_schedule[time_slot] = activities
+                # Dinner
+                elif time_slot == "6:00 PM":
+                    activities.append("Dinner")
+                
+                # Evening study
+                elif time_slot == "7:00 PM" and not is_weekend:
+                    if courses:
+                        course = random.choice(courses)
+                        activities.append(f"{course['code']} - Evening Study")
+                
+                # Free time / Social
+                elif time_slot in ["8:00 PM", "9:00 PM"]:
+                    if is_weekend:
+                        activities.append("Social Time / Fun")
+                    else:
+                        free_activities = ['Gaming', 'Netflix', 'Social Media', 'Reading for Fun', 'Friends']
+                        activities.append(random.choice(free_activities))
+                
+                # Wind down
+                elif time_slot == "10:00 PM":
+                    activities.append("Wind Down / Prep for Sleep")
+                
+                # Store activities (join if multiple)
+                if activities:
+                    daily_schedule[time_slot] = " | ".join(activities)
+                else:
+                    daily_schedule[time_slot] = "Free Time"
             
             weekly_schedule[day] = daily_schedule
         
@@ -658,74 +684,102 @@ def generate_weekly_schedule(courses, assignments, preferences):
     
     return schedule
 
-def render_weekly_table(weekly_schedule):
-    """Render the weekly schedule as an HTML table"""
+def create_schedule_dataframe(weekly_schedule):
+    """Create a pandas DataFrame for the schedule table"""
     time_slots = [
-        "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM",
-        "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
+        "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+        "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
+        "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
     ]
     
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
-    # Create table HTML
-    table_html = """
-    <table class="weekly-table">
-        <thead>
-            <tr>
-                <th>Time</th>
-    """
-    
-    for day in days:
-        table_html += f"<th>{day}</th>"
-    
-    table_html += """
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
+    # Create the dataframe
+    data = []
     for time_slot in time_slots:
-        table_html += f"""
-            <tr>
-                <td class="time-slot">{time_slot}</td>
-        """
-        
+        row = [time_slot]
         for day in days:
-            activities = weekly_schedule.get(day, {}).get(time_slot, [])
-            
-            cell_content = ""
-            for activity in activities:
-                activity_type = activity.get('type', 'other')
-                activity_text = activity['activity']
-                
-                # Add duration if available
-                if activity.get('duration'):
-                    activity_text += f" ({activity['duration']}m)"
-                
-                cell_content += f'<div class="{activity_type}-activity">{activity_text}</div>'
-            
-            if not cell_content:
-                cell_content = '<div style="color: rgba(255,255,255,0.3); font-style: italic;">Free time</div>'
-            
-            table_html += f'<td class="activity-cell">{cell_content}</td>'
-        
-        table_html += "</tr>"
+            activity = weekly_schedule.get(day, {}).get(time_slot, "Free Time")
+            row.append(activity)
+        data.append(row)
     
-    table_html += """
-        </tbody>
-    </table>
-    """
+    df = pd.DataFrame(data, columns=["Time"] + days)
+    return df
+
+def generate_pdf_schedule(schedule_data, user_data):
+    """Generate a PDF schedule"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
     
-    return table_html
+    # Create custom styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#6c5ce7')
+    )
+    
+    # Build the story
+    story = []
+    
+    # Title
+    story.append(Paragraph("🎯 FocusFlow Schedule", title_style))
+    story.append(Spacer(1, 20))
+    
+    # Add schedule tables for each week
+    for week_num in range(4):
+        week_key = f'week_{week_num}'
+        if week_key in schedule_data:
+            # Week header
+            story.append(Paragraph(f"Week {week_num + 1}", styles['Heading2']))
+            story.append(Spacer(1, 12))
+            
+            # Create schedule table
+            weekly_schedule = schedule_data[week_key]
+            df = create_schedule_dataframe(weekly_schedule)
+            
+            # Convert to table data
+            table_data = []
+            for _, row in df.iterrows():
+                table_data.append(list(row))
+            
+            # Create table
+            table = Table(table_data, colWidths=[0.8*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9ff')),
+                ('FONTSIZE', (0, 1), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e0e6ff')),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            
+            story.append(table)
+            story.append(Spacer(1, 20))
+            
+            # Page break after each week except the last
+            if week_num < 3:
+                story.append(PageBreak())
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 def main():
-    # Hero Section
+    # Compact Hero Section
     st.markdown("""
     <div class="main-container">
-        <div class="hero-section">
-            <div class="hero-title">⚡ StudyFlow</div>
-            <div class="hero-subtitle">Your AI-powered study scheduler that balances academics with life</div>
+        <div class="compact-hero">
+            <h1>🎯 FocusFlow</h1>
+            <p>Balance academics with wellness and life</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -744,26 +798,18 @@ def show_course_setup():
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">1</span>Add Your Courses</h2>
-        <p>Upload each syllabus individually for accurate course detection. This helps us create a personalized schedule for each class.</p>
+        <p>Upload each syllabus individually for accurate course detection. Each upload should be for one specific course.</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Show current courses
     if st.session_state.courses:
         st.markdown("### 📚 Your Courses")
-        for i, course in enumerate(st.session_state.courses):
+        for course in st.session_state.courses:
             st.markdown(f"""
             <div class="course-card">
-                <div class="course-header">
-                    <div>
-                        <div class="course-code">{course['code']}</div>
-                        <div class="course-name">{course['name']}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div>⭐ {course['difficulty']}/5</div>
-                        <div>{course['credits']} credits</div>
-                    </div>
-                </div>
+                <div class="course-code">{course['code']}</div>
+                <div class="course-name">{course['name']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -810,16 +856,12 @@ def show_course_setup():
     with st.expander("➕ Add Course Manually"):
         manual_code = st.text_input("Course Code", key="manual_code")
         manual_name = st.text_input("Course Name", key="manual_name")
-        manual_difficulty = st.slider("Difficulty Level", 1, 5, 3, key="manual_difficulty")
-        manual_credits = st.selectbox("Credits", [1, 2, 3, 4, 5], index=2, key="manual_credits")
         
         if st.button("Add Manual Course"):
             if manual_code and manual_name:
                 course_info = {
                     'code': manual_code,
-                    'name': manual_name,
-                    'difficulty': manual_difficulty,
-                    'credits': manual_credits
+                    'name': manual_name
                 }
                 st.session_state.courses.append(course_info)
                 st.success(f"✅ Added {manual_code} manually!")
@@ -845,18 +887,18 @@ def show_preferences_step():
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">2</span>Personalize Your Schedule</h2>
-        <p>Tell us about your preferences so we can create a schedule that works for your lifestyle</p>
+        <p>Set your preferences to create a schedule that works for your lifestyle</p>
     </div>
     """, unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**⏰ Time Preferences**")
+        st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00")
         bedtime = st.slider("Bedtime", 10, 2, 11, format="%d:00")
         
-        st.markdown("**📚 Study Preferences**")
+        st.markdown("### 📚 Study Preferences")
         attention_span = st.slider("Study session length (minutes)", 15, 90, 45)
         study_intensity = st.selectbox(
             "Study intensity",
@@ -864,15 +906,67 @@ def show_preferences_step():
         )
     
     with col2:
-        st.markdown("**🎯 Lifestyle Balance**")
-        include_breaks = st.checkbox("Include social media breaks", value=True)
-        include_exercise = st.checkbox("Include exercise/intramural time", value=True)
-        include_social = st.checkbox("Include social/relaxation time", value=True)
+        st.markdown("### 🏃 Intramural Activities")
+        include_intramurals = st.checkbox("Include intramural/exercise time", value=False)
         
-        st.markdown("**📱 Wellness Focus**")
-        emphasize_sleep = st.checkbox("Emphasize sleep importance", value=True)
-        emphasize_meals = st.checkbox("Include regular meal times", value=True)
-        emphasize_balance = st.checkbox("Emphasize work-life balance", value=True)
+        if include_intramurals:
+            st.markdown("**Add Your Activities:**")
+            activity_name = st.text_input("Activity Name (e.g., Soccer, Basketball)")
+            activity_type = st.selectbox("Activity Type", ["Practice", "Game", "Workout", "Club Meeting"])
+            
+            # Activity scheduling
+            is_scheduled = st.checkbox("Has specific schedule?", value=False)
+            
+            if is_scheduled:
+                selected_days = st.multiselect(
+                    "Select days",
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                )
+                activity_time = st.time_input("Time", value=datetime.strptime("17:00", "%H:%M").time())
+            
+            if st.button("Add Activity") and activity_name:
+                intramural = {
+                    'name': activity_name,
+                    'type': activity_type,
+                    'scheduled': is_scheduled,
+                    'days': selected_days if is_scheduled else [],
+                    'time': activity_time.strftime("%H:%M") if is_scheduled else None
+                }
+                st.session_state.intramurals.append(intramural)
+                st.success(f"✅ Added {activity_name}!")
+                st.rerun()
+        
+        # Show added intramurals
+        if st.session_state.intramurals:
+            st.markdown("""
+            <div class="intramural-card">
+                <h4>🏃 Your Activities</h4>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for intramural in st.session_state.intramurals:
+                schedule_info = ""
+                if intramural.get('scheduled'):
+                    days = ", ".join(intramural.get('days', []))
+                    time = intramural.get('time', 'TBD')
+                    schedule_info = f" - {days} at {time}"
+                
+                st.markdown(f"""
+                <div class="activity-item">
+                    {intramural['name']} ({intramural['type']}){schedule_info}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Wellness information (no checkboxes - automatically included)
+    st.markdown("""
+    <div class="wellness-info">
+        <h4>🌟 Wellness Focus (Automatically Included)</h4>
+        <p><strong>Sleep:</strong> Regular sleep schedule is crucial for memory consolidation and focus</p>
+        <p><strong>Meals:</strong> Consistent eating times maintain energy levels and brain function</p>
+        <p><strong>Free Time:</strong> Relaxation and social time prevent burnout and improve wellbeing</p>
+        <p><strong>Balance:</strong> A balanced schedule is more sustainable and effective long-term</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Store preferences
     preferences = {
@@ -880,12 +974,7 @@ def show_preferences_step():
         'bedtime': bedtime,
         'attention_span': attention_span,
         'study_intensity': study_intensity,
-        'include_breaks': include_breaks,
-        'include_exercise': include_exercise,
-        'include_social': include_social,
-        'emphasize_sleep': emphasize_sleep,
-        'emphasize_meals': emphasize_meals,
-        'emphasize_balance': emphasize_balance
+        'include_intramurals': include_intramurals
     }
     
     st.session_state.user_data = preferences
@@ -911,6 +1000,7 @@ def show_preferences_step():
                 schedule = generate_weekly_schedule(
                     st.session_state.courses,
                     st.session_state.get('assignments', []),
+                    st.session_state.intramurals,
                     preferences
                 )
                 st.session_state.final_schedule = schedule
@@ -918,17 +1008,18 @@ def show_preferences_step():
                 st.rerun()
 
 def show_schedule_step():
-    """Step 3: Schedule display with weekly table"""
+    """Step 3: Schedule display with clean table"""
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">3</span>Your Weekly Schedule</h2>
-        <p>Here's your personalized weekly schedule that balances academics with wellness and social life</p>
+        <p>Here's your personalized weekly schedule that balances academics with wellness and life</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Stats
     courses_count = len(st.session_state.courses)
     assignments_count = len(st.session_state.get('assignments', []))
+    intramurals_count = len(st.session_state.intramurals)
     attention_span = st.session_state.user_data.get('attention_span', 45)
     
     st.markdown(f"""
@@ -942,34 +1033,12 @@ def show_schedule_step():
             <div class="stat-label">Assignments</div>
         </div>
         <div class="stat-card">
-            <span class="stat-number">{attention_span}</span>
-            <div class="stat-label">Min Sessions</div>
+            <span class="stat-number">{intramurals_count}</span>
+            <div class="stat-label">Activities</div>
         </div>
         <div class="stat-card">
-            <span class="stat-number">4</span>
-            <div class="stat-label">Weeks Planned</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Legend
-    st.markdown("""
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color study-activity" style="background: rgba(108, 92, 231, 0.2); border-left-color: #6c5ce7;"></div>
-            <span>📚 Study Sessions</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color meal-activity" style="background: rgba(253, 203, 110, 0.2); border-left-color: #fdcb6e;"></div>
-            <span>🍽️ Meals</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color free-activity" style="background: rgba(0, 184, 148, 0.2); border-left-color: #00b894;"></div>
-            <span>🎉 Free Time</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color break-activity" style="background: rgba(253, 121, 168, 0.2); border-left-color: #fd79a8;"></div>
-            <span>📱 Breaks</span>
+            <span class="stat-number">{attention_span}</span>
+            <div class="stat-label">Min Sessions</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -987,51 +1056,65 @@ def show_schedule_step():
                 st.rerun()
         
         with col2:
-            st.markdown(f'<div class="current-week">Week {current_week + 1} of {total_weeks}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="week-title">Week {current_week + 1} of {total_weeks}</div>', unsafe_allow_html=True)
         
         with col3:
             if st.button("Next Week →", disabled=current_week >= total_weeks - 1):
                 st.session_state.current_week = min(total_weeks - 1, current_week + 1)
                 st.rerun()
         
-        # Display current week
+        # Display current week as a clean table
         week_key = f'week_{current_week}'
         if week_key in st.session_state.final_schedule:
             weekly_schedule = st.session_state.final_schedule[week_key]
-            table_html = render_weekly_table(weekly_schedule)
-            st.markdown(table_html, unsafe_allow_html=True)
+            df = create_schedule_dataframe(weekly_schedule)
+            
+            # Display the schedule table
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Time": st.column_config.Column(width="small"),
+                    "Monday": st.column_config.Column(width="medium"),
+                    "Tuesday": st.column_config.Column(width="medium"),
+                    "Wednesday": st.column_config.Column(width="medium"),
+                    "Thursday": st.column_config.Column(width="medium"),
+                    "Friday": st.column_config.Column(width="medium"),
+                    "Saturday": st.column_config.Column(width="medium"),
+                    "Sunday": st.column_config.Column(width="medium"),
+                }
+            )
     
-    # Wellness reminders
-    st.markdown("""
-    <div class="setup-card">
-        <h3>💡 Wellness Reminders</h3>
-        <p>Your schedule includes these important elements for academic success:</p>
-        <ul>
-            <li><strong>🛌 Sleep:</strong> Adequate rest is crucial for memory consolidation and focus</li>
-            <li><strong>🍽️ Meals:</strong> Regular eating maintains energy levels and brain function</li>
-            <li><strong>🎉 Free Time:</strong> Relaxation and social time prevent burnout and improve wellbeing</li>
-            <li><strong>📱 Breaks:</strong> Short breaks between study sessions improve retention</li>
-            <li><strong>⚖️ Balance:</strong> A balanced schedule is more sustainable long-term</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Export options
+    # Export section
     st.markdown("### 🚀 Export Your Schedule")
     
-    col1, col2, col3 = st.columns(3)
+    if st.session_state.final_schedule and st.session_state.user_data:
+        # Generate PDF
+        pdf_buffer = generate_pdf_schedule(st.session_state.final_schedule, st.session_state.user_data)
+        pdf_data = pdf_buffer.getvalue()
+        
+        st.download_button(
+            label="📄 Download PDF Schedule",
+            data=pdf_data,
+            file_name=f"FocusFlow_Schedule_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            help="Download a beautifully formatted PDF of your 4-week schedule"
+        )
+    
+    # Navigation
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📄 Download PDF"):
-            st.info("PDF generation coming soon!")
-    
-    with col2:
-        if st.button("📅 Export Calendar"):
-            st.info("Calendar export coming soon!")
-    
-    with col3:
         if st.button("🔄 Modify Schedule"):
             st.session_state.step = 2
+            st.rerun()
+    
+    with col2:
+        if st.button("🏠 Start Over"):
+            # Reset all session state
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
     
     # Progress complete
@@ -1043,15 +1126,15 @@ def show_schedule_step():
     """, unsafe_allow_html=True)
     
     st.success(f"""
-    🎉 **Your StudyFlow Schedule is Ready!**
+    🎉 **Your FocusFlow Schedule is Ready!**
     
     ✅ **{courses_count} courses** with structured study sessions
-    ✅ **{assignments_count} assignments** tracked and scheduled
-    ✅ **{attention_span}-minute focus blocks** optimized for your attention span
+    ✅ **{assignments_count} assignments** tracked and planned
+    ✅ **{intramurals_count} activities** integrated into your schedule
     ✅ **Wellness-focused design** with sleep, meals, and free time prioritized
-    ✅ **4 weeks** of detailed weekly planning
+    ✅ **4 weeks** of detailed planning ready for download
     
-    📚 **Remember:** This schedule balances academics with life - stick to it and adjust as needed!
+    📚 **Remember:** This schedule emphasizes balance - academics, wellness, and life all matter for your success!
     """)
 
 if __name__ == "__main__":
