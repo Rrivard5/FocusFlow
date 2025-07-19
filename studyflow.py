@@ -607,10 +607,8 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
-    # Get start date from preferences - DON'T adjust it, trust user input
-    start_date = preferences.get('start_date', datetime.now().date())
-    if isinstance(start_date, str):
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    # Use current date for display purposes
+    start_date = datetime.now().date()
     
     # Generate just one week template
     weekly_schedule = {}
@@ -738,12 +736,18 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
         
         # Add "Go to Sleep" slot 30 minutes before bedtime
-        if bedtime >= 10:  # If bedtime is 10 PM or later
-            go_to_sleep_hour = bedtime - 1 if bedtime > 12 else bedtime + 11
-            go_to_sleep_time = f"{go_to_sleep_hour}:30 PM" if bedtime >= 10 else f"{go_to_sleep_hour}:30 AM"
-        else:  # If bedtime is early morning (like 1 AM = bedtime_hour of 1)
-            go_to_sleep_hour = 12
+        if bedtime >= 22:  # If bedtime is 10 PM (22) or later
+            go_to_sleep_hour = bedtime
+            go_to_sleep_time = f"{go_to_sleep_hour - 12}:30 PM" if bedtime > 12 else f"{bedtime}:30 PM"
+        elif bedtime <= 2:  # If bedtime is early morning (like 1 AM = bedtime_hour of 1)  
+            go_to_sleep_hour = bedtime + 12
             go_to_sleep_time = f"{go_to_sleep_hour}:30 AM"
+        else:
+            go_to_sleep_hour = bedtime
+            go_to_sleep_time = f"{bedtime}:30 PM"
+        
+        # Debug the go to sleep time calculation
+        print(f"Bedtime: {bedtime}, Go to sleep time: {go_to_sleep_time}")
         
         if go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
@@ -929,21 +933,26 @@ def generate_pdf_schedule(schedule_data, user_data):
         fontSize=9,
         spaceAfter=4,
         textColor=colors.HexColor('#2f3542'),
-        leftIndent=10
+        leftIndent=15
     )
     
     # Build the story
     story = []
     
-    # Compact title
+    # Title
     story.append(Paragraph("🎯 FocusFlow Weekly Template", title_style))
     story.append(Spacer(1, 8))
     
-    # Compact reminders
-    story.append(Paragraph("📋 Key Points: This is a reusable weekly template - adjust as needed • Study times are color-coded by subject • 'Go to Sleep' helps wind-down routine", wellness_style))
+    # Important reminders section
+    story.append(Paragraph("📋 Important Reminders", ParagraphStyle('RemindersHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
+    story.append(Paragraph("• <b>Reusable template:</b> This weekly schedule can be repeated throughout your semester - adjust as needed for different weeks.", wellness_style))
+    story.append(Paragraph("• <b>Sleep is crucial:</b> This schedule prioritizes 7-9 hours of sleep for optimal learning and memory consolidation.", wellness_style))
+    story.append(Paragraph("• <b>Sample schedule:</b> This is one possible arrangement. Modify times and activities based on your needs and preferences.", wellness_style))
+    story.append(Paragraph("• <b>Flexibility matters:</b> Use 'buffer time' between classes for walking, transitions, or short breaks.", wellness_style))
+    story.append(Paragraph("• <b>Balance is key:</b> Study time is balanced with meals, exercise, and relaxation for long-term sustainability.", wellness_style))
     story.append(Spacer(1, 12))
     
-    # Create schedule table with better sizing for landscape
+    # Create schedule table with proper headers
     df = create_schedule_dataframe(schedule_data)
     
     # Use more time slots since we have more space in landscape
@@ -952,9 +961,23 @@ def generate_pdf_schedule(schedule_data, user_data):
                 "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"]
     
     table_data = []
+    # Add header row with proper day names
+    header_row = ["Time"]
+    for col in df.columns[1:]:  # Skip the Time column
+        if '\n' in col:
+            day_name = col.split('\n')[0]  # Get just the day name, not the date
+        else:
+            day_name = col
+        header_row.append(day_name)
+    table_data.append(header_row)
+    
+    # Add data rows
     for _, row in df.iterrows():
         if row['Time'] in key_times:
-            table_data.append(list(row))
+            data_row = [row['Time']]
+            for col in df.columns[1:]:
+                data_row.append(row[col])
+            table_data.append(data_row)
     
     # Create table with better column widths for landscape
     table = Table(table_data, colWidths=[0.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
@@ -1009,21 +1032,22 @@ def generate_pdf_schedule(schedule_data, user_data):
     
     table.setStyle(TableStyle(table_style))
     story.append(table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 12))
     
-    # Compact study strategies section
+    # Evidence-based study strategies section
     story.append(Paragraph("📚 Evidence-Based Study Strategies", ParagraphStyle('StudyHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
+    story.append(Paragraph("<b>Active Recall:</b> Test yourself regularly instead of just re-reading. Use flashcards, practice questions, or explain concepts out loud.", wellness_style))
+    story.append(Paragraph("<b>Spaced Repetition:</b> Review material at increasing intervals (1 day, 3 days, 1 week, 2 weeks) for better retention.", wellness_style))
+    story.append(Paragraph("<b>Pomodoro Technique:</b> Study for 25 minutes, then take a 5-minute break. After 4 cycles, take a longer 15-30 minute break.", wellness_style))
+    story.append(Paragraph("<b>Interleaving:</b> Mix different topics or types of problems in one study session rather than studying one subject for hours.", wellness_style))
+    story.append(Paragraph("<b>Elaboration:</b> Connect new information to what you already know. Ask 'why' and 'how' questions.", wellness_style))
+    story.append(Paragraph("<b>Dual Coding:</b> Use both visual and verbal information - draw diagrams, create mind maps, use charts and graphs.", wellness_style))
+    story.append(Paragraph("<b>Practice Testing:</b> Take practice exams under timed conditions to simulate real testing scenarios.", wellness_style))
+    story.append(Spacer(1, 8))
     
-    strategies = [
-        "Active Recall: Test yourself instead of re-reading",
-        "Spaced Repetition: Review at increasing intervals",
-        "Pomodoro: 25min study + 5min break cycles",
-        "Interleaving: Mix different topics in one session",
-        "Practice Testing: Simulate exam conditions"
-    ]
-    
-    for strategy in strategies:
-        story.append(Paragraph(f"• {strategy}", ParagraphStyle('Strategy', parent=styles['Normal'], fontSize=8, spaceAfter=2, leftIndent=10)))
+    # Color legend
+    story.append(Paragraph("🎨 Color Guide", ParagraphStyle('ColorHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
+    story.append(Paragraph("Classes: Blue | Study Sessions: Purple variations by subject | Meals: Orange | Activities: Brown | Sleep: Dark Gray | Go to Sleep: Light Gray | Breaks: Red | Free Time: Teal", wellness_style))
     
     # Build PDF
     doc.build(story)
@@ -1358,13 +1382,6 @@ def show_preferences_step():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 📅 Schedule Dates")
-        start_date = st.date_input(
-            "When does this schedule start?",
-            value=datetime.now().date(),
-            help="Choose any day you want this schedule to begin"
-        )
-        
         st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
         
@@ -1498,9 +1515,8 @@ def show_preferences_step():
     </div>
     """, unsafe_allow_html=True)
     
-    # Store preferences
+    # Store preferences (removed start_date since it's no longer needed)
     preferences = {
-        'start_date': start_date,
         'wake_time': wake_time,
         'bedtime': bedtime_hour,
         'study_intensity': study_intensity,
