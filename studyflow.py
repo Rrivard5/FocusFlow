@@ -858,7 +858,7 @@ def create_schedule_dataframe(weekly_schedule):
     return df
 
 def style_schedule_dataframe(df, weekly_schedule):
-    """Apply color coding to the schedule dataframe"""
+    """Apply color coding to the schedule dataframe with different study colors"""
     def color_cell(val):
         # Handle blank cells
         if val == "":
@@ -875,7 +875,21 @@ def style_schedule_dataframe(df, weekly_schedule):
                     elif activity_type == "class":
                         return "background-color: #3742fa; color: white; font-weight: bold;"
                     elif activity_type == "study":
-                        return "background-color: #5f27cd; color: white; font-weight: bold;"
+                        # Different colors for different courses in study time
+                        if 'MICROA' in val or 'MICRO' in val:
+                            return "background-color: #8e44ad; color: white; font-weight: bold;"  # Purple
+                        elif 'A&PI' in val or 'A&P' in val:
+                            return "background-color: #9b59b6; color: white; font-weight: bold;"  # Light Purple
+                        elif 'CHEM' in val:
+                            return "background-color: #e74c3c; color: white; font-weight: bold;"  # Red
+                        elif 'BIO' in val:
+                            return "background-color: #27ae60; color: white; font-weight: bold;"  # Green
+                        elif 'MATH' in val:
+                            return "background-color: #f39c12; color: white; font-weight: bold;"  # Orange
+                        elif 'PHYS' in val:
+                            return "background-color: #2980b9; color: white; font-weight: bold;"  # Blue
+                        else:
+                            return "background-color: #5f27cd; color: white; font-weight: bold;"  # Default study purple
                     elif activity_type == "meal":
                         return "background-color: #ff9f43; color: white; font-weight: bold;"
                     elif activity_type == "activity":
@@ -893,17 +907,18 @@ def style_schedule_dataframe(df, weekly_schedule):
     return df.style.applymap(color_cell, subset=df.columns[1:])
 
 def generate_pdf_schedule(schedule_data, user_data):
-    """Generate a PDF schedule with wellness reminders and study strategies"""
+    """Generate a PDF schedule in landscape with colors and better formatting"""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+    # Use landscape orientation
+    doc = SimpleDocTemplate(buffer, pagesize=(11*inch, 8.5*inch), rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     
     # Create custom styles
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'Title',
         parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=12,
+        fontSize=16,
+        spaceAfter=8,
         alignment=TA_CENTER,
         textColor=colors.HexColor('#6c5ce7')
     )
@@ -911,10 +926,10 @@ def generate_pdf_schedule(schedule_data, user_data):
     wellness_style = ParagraphStyle(
         'Wellness',
         parent=styles['Normal'],
-        fontSize=10,
-        spaceAfter=6,
+        fontSize=9,
+        spaceAfter=4,
         textColor=colors.HexColor('#2f3542'),
-        leftIndent=20
+        leftIndent=10
     )
     
     # Build the story
@@ -922,36 +937,17 @@ def generate_pdf_schedule(schedule_data, user_data):
     
     # Compact title
     story.append(Paragraph("🎯 FocusFlow Weekly Template", title_style))
-    story.append(Spacer(1, 12))
-    
-    # Wellness reminder at the top
-    story.append(Paragraph("📋 Important Reminders", styles['Heading2']))
-    story.append(Paragraph("• <b>Reusable template:</b> This weekly schedule can be repeated throughout your semester.", wellness_style))
-    story.append(Paragraph("• <b>Flexibility matters:</b> Adjust times and activities based on your weekly needs and priorities.", wellness_style))
-    story.append(Paragraph("• <b>Sleep hygiene:</b> Notice the 'Go to Sleep' reminder to help you wind down before bedtime.", wellness_style))
-    story.append(Paragraph("• <b>Balance is key:</b> Study time is balanced with meals, exercise, and relaxation for sustainability.", wellness_style))
-    story.append(Spacer(1, 16))
-    
-    # Add evidence-based study strategies
-    story.append(Paragraph("📚 Evidence-Based Study Strategies", styles['Heading2']))
-    story.append(Paragraph("<b>Active Recall:</b> Test yourself regularly instead of just re-reading. Use flashcards, practice questions, or explain concepts out loud.", wellness_style))
-    story.append(Paragraph("<b>Spaced Repetition:</b> Review material at increasing intervals (1 day, 3 days, 1 week, 2 weeks) for better retention.", wellness_style))
-    story.append(Paragraph("<b>Pomodoro Technique:</b> Study for 25 minutes, then take a 5-minute break. After 4 cycles, take a longer 15-30 minute break.", wellness_style))
-    story.append(Paragraph("<b>Interleaving:</b> Mix different topics or types of problems in one study session rather than studying one subject for hours.", wellness_style))
-    story.append(Paragraph("<b>Elaboration:</b> Connect new information to what you already know. Ask 'why' and 'how' questions.", wellness_style))
-    story.append(Paragraph("<b>Dual Coding:</b> Use both visual and verbal information - draw diagrams, create mind maps, use charts and graphs.", wellness_style))
-    story.append(Paragraph("<b>Practice Testing:</b> Take practice exams under timed conditions to simulate real testing scenarios.", wellness_style))
-    story.append(Spacer(1, 16))
-    
-    # Add the weekly schedule
-    story.append(Paragraph("Weekly Schedule Template", styles['Heading3']))
     story.append(Spacer(1, 8))
     
-    # Create schedule table
+    # Compact reminders
+    story.append(Paragraph("📋 Key Points: This is a reusable weekly template - adjust as needed • Study times are color-coded by subject • 'Go to Sleep' helps wind-down routine", wellness_style))
+    story.append(Spacer(1, 12))
+    
+    # Create schedule table with better sizing for landscape
     df = create_schedule_dataframe(schedule_data)
     
-    # Convert to table data (show only key times to save space)
-    key_times = ["7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
+    # Use more time slots since we have more space in landscape
+    key_times = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
                 "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
                 "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"]
     
@@ -960,28 +956,74 @@ def generate_pdf_schedule(schedule_data, user_data):
         if row['Time'] in key_times:
             table_data.append(list(row))
     
-    # Create table
-    table = Table(table_data, colWidths=[0.8*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch])
-    table.setStyle(TableStyle([
+    # Create table with better column widths for landscape
+    table = Table(table_data, colWidths=[0.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
+    
+    # Apply colors to the table
+    table_style = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('FONTSIZE', (0, 1), (-1, -1), 6),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9ff')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e0e6ff')),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f8f9ff'), colors.HexColor('#ffffff')])
-    ]))
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]
     
+    # Apply cell-specific colors based on content
+    for row_idx, row_data in enumerate(table_data[1:], 1):  # Skip header row
+        for col_idx, cell_content in enumerate(row_data[1:], 1):  # Skip time column
+            if cell_content:
+                # Determine color based on activity type
+                if 'Sleep' in cell_content and 'Go to' not in cell_content:
+                    bg_color = colors.HexColor('#2f3542')
+                elif 'Go to Sleep' in cell_content:
+                    bg_color = colors.HexColor('#5a6c7d')
+                elif 'Lecture' in cell_content or 'Lab' in cell_content:
+                    bg_color = colors.HexColor('#3742fa')
+                elif 'Study Time' in cell_content:
+                    # Different colors for different courses
+                    if 'MICROA' in cell_content or 'MICRO' in cell_content:
+                        bg_color = colors.HexColor('#8e44ad')  # Purple
+                    elif 'A&PI' in cell_content or 'A&P' in cell_content:
+                        bg_color = colors.HexColor('#9b59b6')  # Light Purple
+                    else:
+                        bg_color = colors.HexColor('#5f27cd')  # Default study purple
+                elif 'Breakfast' in cell_content or 'Lunch' in cell_content or 'Dinner' in cell_content:
+                    bg_color = colors.HexColor('#ff9f43')
+                elif 'Break' in cell_content:
+                    bg_color = colors.HexColor('#ff6b6b')
+                elif 'Practice' in cell_content or 'Game' in cell_content or 'Workout' in cell_content:
+                    bg_color = colors.HexColor('#e67e22')
+                elif 'Free Time' in cell_content:
+                    bg_color = colors.HexColor('#00d2d3')
+                else:
+                    bg_color = colors.white
+                
+                # Add background color and white text for visibility
+                table_style.append(('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), bg_color))
+                if bg_color != colors.white:
+                    table_style.append(('TEXTCOLOR', (col_idx, row_idx), (col_idx, row_idx), colors.white))
+    
+    table.setStyle(TableStyle(table_style))
     story.append(table)
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 10))
     
-    # Footer with color legend
-    story.append(Paragraph("🎨 Color Guide", styles['Heading3']))
-    story.append(Paragraph("Classes: Blue | Study: Purple | Meals: Orange | Activities: Brown | Sleep: Dark Gray | Go to Sleep: Light Gray | Breaks: Red | Free Time: Teal", wellness_style))
+    # Compact study strategies section
+    story.append(Paragraph("📚 Evidence-Based Study Strategies", ParagraphStyle('StudyHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
+    
+    strategies = [
+        "Active Recall: Test yourself instead of re-reading",
+        "Spaced Repetition: Review at increasing intervals",
+        "Pomodoro: 25min study + 5min break cycles",
+        "Interleaving: Mix different topics in one session",
+        "Practice Testing: Simulate exam conditions"
+    ]
+    
+    for strategy in strategies:
+        story.append(Paragraph(f"• {strategy}", ParagraphStyle('Strategy', parent=styles['Normal'], fontSize=8, spaceAfter=2, leftIndent=10)))
     
     # Build PDF
     doc.build(story)
@@ -1540,18 +1582,42 @@ def show_schedule_step():
     # Export section
     st.markdown("### 🚀 Export Your Schedule")
     
-    if st.session_state.final_schedule and st.session_state.user_data:
-        # Generate PDF
-        pdf_buffer = generate_pdf_schedule(st.session_state.final_schedule, st.session_state.user_data)
-        pdf_data = pdf_buffer.getvalue()
-        
-        st.download_button(
-            label="📄 Download PDF Schedule",
-            data=pdf_data,
-            file_name=f"FocusFlow_Weekly_Template_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf",
-            help="Download your weekly schedule template with study strategies"
-        )
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.session_state.final_schedule and st.session_state.user_data:
+            # Generate PDF
+            pdf_buffer = generate_pdf_schedule(st.session_state.final_schedule, st.session_state.user_data)
+            pdf_data = pdf_buffer.getvalue()
+            
+            st.download_button(
+                label="📄 Download PDF Schedule",
+                data=pdf_data,
+                file_name=f"FocusFlow_Weekly_Template_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                help="Download your weekly schedule template with study strategies"
+            )
+    
+    with col2:
+        if st.session_state.courses:
+            # Create save data
+            save_data = {
+                'courses': st.session_state.courses,
+                'intramurals': st.session_state.intramurals,
+                'user_data': st.session_state.user_data,
+                'created_date': datetime.now().strftime('%Y-%m-%d'),
+                'app_version': '1.0'
+            }
+            
+            save_json = json.dumps(save_data, indent=2, default=str)
+            
+            st.download_button(
+                label="💾 Save Configuration",
+                data=save_json,
+                file_name=f"FocusFlow_Config_{datetime.now().strftime('%Y%m%d')}.json",
+                mime="application/json",
+                help="Save your setup to reload later if you need to make changes"
+            )
     
     # Navigation
     col1, col2 = st.columns(2)
