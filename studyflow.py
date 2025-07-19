@@ -552,38 +552,9 @@ def parse_excel_course_file(file):
                 
                 course_data['class_schedule'] = class_schedule
                 
-                # Read assignments (limited to save memory)
-                assignment_start_row = 14
-                assignment_end_row = min(25, df.shape[0])  # Reduced range
-                
-                for index in range(assignment_start_row, assignment_end_row):
-                    try:
-                        if index < df.shape[0] and df.shape[1] >= 2:
-                            assignment_name_val = df.iloc[index, 0]
-                            assignment_type_val = df.iloc[index, 1]
-                            due_date_val = df.iloc[index, 2] if df.shape[1] >= 3 else ""
-                            
-                            if pd.notna(assignment_name_val) and pd.notna(assignment_type_val):
-                                assignment_name = str(assignment_name_val).strip()
-                                assignment_type = str(assignment_type_val).strip()
-                                due_date = str(due_date_val).strip() if pd.notna(due_date_val) else ""
-                                
-                                if 'Large Assignment' in assignment_name or 'Exam' in assignment_type:
-                                    assignments.append({
-                                        'id': str(uuid.uuid4()),
-                                        'title': assignment_type,
-                                        'date': due_date,
-                                        'type': 'exam' if 'Exam' in assignment_type else 'assignment',
-                                        'course': course_data.get('code', 'UNKNOWN'),
-                                        'priority': 'high' if 'Exam' in assignment_type else 'medium'
-                                    })
-                                    # Limit assignments per course to save memory
-                                    if len(assignments) >= 10:
-                                        break
-                    except:
-                        continue
-                
-                course_data['assignments'] = assignments
+                # Simplified: Don't process assignments from Excel
+                # Focus on class schedules and time management only
+                course_data['assignments'] = []
                 
                 # Only add course if we got some basic info
                 if 'name' in course_data:
@@ -759,7 +730,7 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                 print(f"Error parsing time for {course['code']} {class_type}: {e}")
                                 continue
             
-            # STEP 2: Add sleep schedule (only in free slots)
+            # STEP 2: Add sleep schedule and end-of-day "Go to Sleep" (only in free slots)
             wake_time = preferences.get('wake_time', 8)
             bedtime = preferences.get('bedtime', 11)
             
@@ -778,6 +749,17 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     # Sleep from bedtime to wake time
                     if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
                         daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
+            
+            # Add "Go to Sleep" slot 30 minutes before bedtime
+            if bedtime >= 10:  # If bedtime is 10 PM or later
+                go_to_sleep_hour = bedtime - 1 if bedtime > 12 else bedtime + 11
+                go_to_sleep_time = f"{go_to_sleep_hour}:30 PM" if bedtime >= 10 else f"{go_to_sleep_hour}:30 AM"
+            else:  # If bedtime is early morning (like 1 AM = bedtime_hour of 1)
+                go_to_sleep_hour = 12
+                go_to_sleep_time = f"{go_to_sleep_hour}:30 AM"
+            
+            if go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
+                daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
             
             # STEP 3: Add meals (only in free slots)
             meal_times = {
@@ -915,6 +897,8 @@ def style_schedule_dataframe(df, weekly_schedule):
                         return "background-color: #e67e22; color: white; font-weight: bold;"
                     elif activity_type == "sleep":
                         return "background-color: #2f3542; color: white; font-weight: bold;"
+                    elif activity_type == "sleep_prep":
+                        return "background-color: #5a6c7d; color: white; font-weight: bold;"
                     elif activity_type == "break":
                         return "background-color: #ff6b6b; color: white; font-weight: bold;"
                     elif activity_type == "free":
@@ -1048,9 +1032,9 @@ def main():
 def show_excel_upload():
     """Step 1: Excel file upload and processing"""
     st.markdown("""
-    <div class="setup-card">
-        <h2><span class="step-number">1</span>Upload Your Course Template</h2>
-        <p>Upload the Excel file with your course information, class schedules, and assignments.</p>
+    <div style="background: rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
+        <h2 style="color: #6c5ce7; margin-bottom: 0.5rem;">📚 Step 1: Course Information</h2>
+        <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Upload Excel file or add courses manually</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1348,9 +1332,9 @@ def show_excel_upload():
 def show_preferences_step():
     """Step 2: Preferences setup"""
     st.markdown("""
-    <div class="setup-card">
-        <h2><span class="step-number">2</span>Personalize Your Schedule</h2>
-        <p>Set your preferences to create a balanced schedule</p>
+    <div style="background: rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
+        <h2 style="color: #6c5ce7; margin-bottom: 0.5rem;">⚙️ Step 2: Your Preferences</h2>
+        <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Set your schedule preferences</p>
     </div>
     """, unsafe_allow_html=True)
     
