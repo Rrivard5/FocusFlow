@@ -262,13 +262,14 @@ st.markdown("""
         transition: all 0.3s ease !important;
         width: 100% !important;
         background: linear-gradient(135deg, #6c5ce7, #a29bfe) !important;
-        color: white !important;
+        color: #ffffff !important;
         box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3) !important;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 25px rgba(108, 92, 231, 0.4) !important;
+        color: #ffffff !important;
     }
     
     .stDownloadButton > button {
@@ -281,13 +282,35 @@ st.markdown("""
         transition: all 0.3s ease !important;
         width: 100% !important;
         background: linear-gradient(135deg, #00b894, #00cec9) !important;
-        color: white !important;
+        color: #ffffff !important;
         box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3) !important;
     }
     
     .stDownloadButton > button:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4) !important;
+        color: #ffffff !important;
+    }
+    
+    /* Fix button text visibility */
+    .stButton button p, .stDownloadButton button p {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Fix selectbox and other form elements */
+    .stSelectbox > div > div > div {
+        color: #000000 !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    .stSelectbox [data-baseweb="select"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    .stSelectbox [data-baseweb="select"] > div {
+        color: #000000 !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
     }
     
     /* Form styling */
@@ -1312,60 +1335,155 @@ def show_excel_upload():
     </div>
     """, unsafe_allow_html=True)
     
-    # Add import/download options at the top
-    st.markdown("### 📥 Import or Download Template")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Download template button
-        template_buffer = create_excel_template()
-        st.download_button(
-            label="📄 Download Excel Template",
-            data=template_buffer.getvalue(),
-            file_name="FocusFlow_Course_Template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download a sample Excel template to fill out with your course information"
-        )
-    
-    with col2:
-        # Import configuration
-        uploaded_config = st.file_uploader(
-            "Import Saved Configuration",
-            type=['json'],
-            help="Upload a previously saved FocusFlow configuration file",
-            key="config_upload"
+    # Main course upload section first
+    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
+        st.markdown("### 📄 Upload Course Template")
+        
+        # Instructions
+        st.info("""
+        **Template Format Requirements:**
+        - Excel file with separate tabs for each course (Course 1, Course 2, etc.)
+        - Each tab should contain course information, class schedules, and assignment details
+        - Use the format: Course title, lecture schedule, lab schedule, assignments, etc.
+        """)
+        
+        uploaded_file = st.file_uploader(
+            "Choose Excel file",
+            type=['xlsx', 'xls'],
+            help="Upload your course template Excel file"
         )
         
-        if uploaded_config is not None:
-            try:
-                config_data = uploaded_config.read().decode('utf-8')
-                if load_config_from_json(config_data):
-                    st.success("✅ Configuration loaded successfully!")
-                    # Skip to step 2 if user data is also loaded
-                    if st.session_state.get('user_data'):
-                        if st.button("🚀 Go to Schedule Generation"):
-                            st.session_state.step = 3
-                            # Generate schedule with loaded data
-                            schedule = generate_weekly_schedule(
-                                st.session_state.courses,
-                                st.session_state.intramurals,
-                                st.session_state.user_data
-                            )
-                            st.session_state.final_schedule = schedule
-                            st.rerun()
-                    else:
-                        if st.button("➡️ Continue to Preferences"):
-                            st.session_state.step = 2
-                            st.rerun()
+        if uploaded_file is not None:
+            with st.spinner("🧠 Processing your course template..."):
+                courses = parse_excel_course_file(uploaded_file)
+                
+                if courses:
+                    st.session_state.courses = courses
+                    
+                    # Create assignments list
+                    all_assignments = []
+                    for course in courses:
+                        all_assignments.extend(course.get('assignments', []))
+                    st.session_state.assignments = all_assignments
+                    
+                    st.success(f"✅ Successfully loaded {len(courses)} courses with {len(all_assignments)} assignments!")
+                    
+                    # Mark file as processed to prevent reprocessing
+                    st.session_state.file_processed = True
+                    st.rerun()
                 else:
-                    st.error("❌ Could not load configuration file. Please check the format.")
-            except Exception as e:
-                st.error(f"❌ Error loading configuration: {str(e)}")
-    
-    # Separator
-    if not st.session_state.get('file_processed', False):
+                    st.error("❌ Could not read course data from the file. Please check the format.")
+        
+        # Alternative options section
         st.markdown("---")
+        st.markdown("### 📥 Alternative Options")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Download template button
+            template_buffer = create_excel_template()
+            st.download_button(
+                label="📄 Download Excel Template",
+                data=template_buffer.getvalue(),
+                file_name="FocusFlow_Course_Template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                help="Download a sample Excel template to fill out with your course information"
+            )
+        
+        with col2:
+            # Import configuration
+            uploaded_config = st.file_uploader(
+                "Import Saved Configuration",
+                type=['json'],
+                help="Upload a previously saved FocusFlow configuration file",
+                key="config_upload"
+            )
+            
+            if uploaded_config is not None:
+                try:
+                    config_data = uploaded_config.read().decode('utf-8')
+                    if load_config_from_json(config_data):
+                        st.success("✅ Configuration loaded successfully!")
+                        # Skip to step 2 if user data is also loaded
+                        if st.session_state.get('user_data'):
+                            if st.button("🚀 Go to Schedule Generation"):
+                                st.session_state.step = 3
+                                # Generate schedule with loaded data
+                                schedule = generate_weekly_schedule(
+                                    st.session_state.courses,
+                                    st.session_state.intramurals,
+                                    st.session_state.user_data
+                                )
+                                st.session_state.final_schedule = schedule
+                                st.rerun()
+                        else:
+                            if st.button("➡️ Continue to Preferences"):
+                                st.session_state.step = 2
+                                st.rerun()
+                    else:
+                        st.error("❌ Could not load configuration file. Please check the format.")
+                except Exception as e:
+                    st.error(f"❌ Error loading configuration: {str(e)}")
+    
+    # Show manual course addition option when no file has been processed
+    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
+        # Option to add course manually
+        with st.expander("➕ Add Course Manually"):
+            st.markdown("**Add a course if you don't have an Excel file:**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                manual_code = st.text_input("Course Code", key="manual_code", placeholder="e.g., BIO1205")
+                manual_name = st.text_input("Course Name", key="manual_name", placeholder="e.g., Biology Lab")
+            
+            with col2:
+                manual_study_time = st.text_input("Daily Study Time", key="manual_study", placeholder="e.g., 30 min")
+            
+            # Class schedule
+            st.markdown("**Class Schedule:**")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                manual_days = st.multiselect(
+                    "Days",
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    key="manual_days"
+                )
+            
+            with col2:
+                manual_start = st.text_input("Start Time", key="manual_start", placeholder="e.g., 9:00 AM")
+            
+            with col3:
+                manual_end = st.text_input("End Time", key="manual_end", placeholder="e.g., 10:30 AM")
+            
+            with col4:
+                manual_location = st.text_input("Location", key="manual_location", placeholder="e.g., Room 101")
+            
+            if st.button("Add Manual Course"):
+                if manual_code and manual_name:
+                    manual_course = {
+                        'code': manual_code,
+                        'name': manual_name,
+                        'daily_study_time': manual_study_time or '30 min',
+                        'class_schedule': []
+                    }
+                    
+                    if manual_days and manual_start and manual_end:
+                        manual_course['class_schedule'] = [{
+                            'days': manual_days,
+                            'start_time': manual_start,
+                            'end_time': manual_end,
+                            'type': 'Lecture',
+                            'location': manual_location
+                        }]
+                    
+                    st.session_state.courses.append(manual_course)
+                    st.session_state.file_processed = True  # Mark as having course data
+                    st.success(f"✅ Added {manual_code} manually!")
+                    st.rerun()
+                else:
+                    st.error("Please fill in at least the course code and name.")
     
     # Show current courses if any
     if st.session_state.courses:
@@ -1469,101 +1587,13 @@ def show_excel_upload():
     
     # File upload section (only show if not editing and haven't processed a file yet)
     if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
-        st.markdown("### 📄 Upload Course Template")
-        
-        # Instructions
-        st.info("""
-        **Template Format Requirements:**
-        - Excel file with separate tabs for each course (Course 1, Course 2, etc.)
-        - Each tab should contain course information, class schedules, and assignment details
-        - Use the format: Course title, lecture schedule, lab schedule, assignments, etc.
-        """)
-        
-        uploaded_file = st.file_uploader(
-            "Choose Excel file",
-            type=['xlsx', 'xls'],
-            help="Upload your course template Excel file"
-        )
-        
-        if uploaded_file is not None:
-            with st.spinner("🧠 Processing your course template..."):
-                courses = parse_excel_course_file(uploaded_file)
-                
-                if courses:
-                    st.session_state.courses = courses
-                    
-                    # Create assignments list
-                    all_assignments = []
-                    for course in courses:
-                        all_assignments.extend(course.get('assignments', []))
-                    st.session_state.assignments = all_assignments
-                    
-                    st.success(f"✅ Successfully loaded {len(courses)} courses with {len(all_assignments)} assignments!")
-                    
-                    # Mark file as processed to prevent reprocessing
-                    st.session_state.file_processed = True
-                    st.rerun()
-                else:
-                    st.error("❌ Could not read course data from the file. Please check the format.")
+        # This section is now moved to the top of the function
+        pass
     
     # Show manual course addition option when no file has been processed
     if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
-        # Option to add course manually
-        with st.expander("➕ Add Course Manually"):
-            st.markdown("**Add a course if you don't have an Excel file:**")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                manual_code = st.text_input("Course Code", key="manual_code", placeholder="e.g., BIO1205")
-                manual_name = st.text_input("Course Name", key="manual_name", placeholder="e.g., Biology Lab")
-            
-            with col2:
-                manual_study_time = st.text_input("Daily Study Time", key="manual_study", placeholder="e.g., 30 min")
-            
-            # Class schedule
-            st.markdown("**Class Schedule:**")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                manual_days = st.multiselect(
-                    "Days",
-                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-                    key="manual_days"
-                )
-            
-            with col2:
-                manual_start = st.text_input("Start Time", key="manual_start", placeholder="e.g., 9:00 AM")
-            
-            with col3:
-                manual_end = st.text_input("End Time", key="manual_end", placeholder="e.g., 10:30 AM")
-            
-            with col4:
-                manual_location = st.text_input("Location", key="manual_location", placeholder="e.g., Room 101")
-            
-            if st.button("Add Manual Course"):
-                if manual_code and manual_name:
-                    manual_course = {
-                        'code': manual_code,
-                        'name': manual_name,
-                        'daily_study_time': manual_study_time or '30 min',
-                        'class_schedule': []
-                    }
-                    
-                    if manual_days and manual_start and manual_end:
-                        manual_course['class_schedule'] = [{
-                            'days': manual_days,
-                            'start_time': manual_start,
-                            'end_time': manual_end,
-                            'type': 'Lecture',
-                            'location': manual_location
-                        }]
-                    
-                    st.session_state.courses.append(manual_course)
-                    st.session_state.file_processed = True  # Mark as having course data
-                    st.success(f"✅ Added {manual_code} manually!")
-                    st.rerun()
-                else:
-                    st.error("Please fill in at least the course code and name.")
+        # This section is now moved to the top of the function  
+        pass
     
     # Show action buttons when courses are loaded
     if st.session_state.courses and st.session_state.get('editing_course') is None:
