@@ -1088,66 +1088,12 @@ def main():
     
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
-    # Check if user wants to load a saved configuration first
-    if not st.session_state.get('config_checked', False):
-        st.markdown("""
-        <div style="background: rgba(108, 92, 231, 0.1); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
-            <h3 style="color: #6c5ce7; margin-bottom: 0.5rem;">🚀 Welcome to FocusFlow!</h3>
-            <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Create a balanced weekly schedule template</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown("**Do you have a saved FocusFlow configuration?**")
-            
-            col_a, col_b = st.columns(2)
-            
-            with col_a:
-                if st.button("📁 Load Saved Config", type="primary"):
-                    st.session_state.show_config_upload = True
-                    st.rerun()
-            
-            with col_b:
-                if st.button("🆕 Start Fresh"):
-                    st.session_state.config_checked = True
-                    st.session_state.step = 1
-                    st.rerun()
-        
-        # Show config upload if requested
-        if st.session_state.get('show_config_upload', False):
-            st.markdown("---")
-            config_file = st.file_uploader(
-                "Upload your saved FocusFlow configuration",
-                type=['json'],
-                help="Load a previously saved FocusFlow configuration"
-            )
-            
-            if config_file is not None:
-                try:
-                    config_data = json.load(config_file)
-                    
-                    # Validate the config file
-                    if 'courses' in config_data and 'user_data' in config_data:
-                        st.session_state.courses = config_data['courses']
-                        st.session_state.intramurals = config_data.get('intramurals', [])
-                        st.session_state.user_data = config_data['user_data']
-                        st.session_state.config_checked = True
-                        st.session_state.step = 2  # Skip to preferences since we have courses
-                        
-                        st.success(f"✅ Loaded saved configuration with {len(config_data['courses'])} courses!")
-                        st.info(f"📅 Originally created: {config_data.get('created_date', 'Unknown date')}")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid configuration file format.")
-                except json.JSONDecodeError:
-                    st.error("❌ Could not read configuration file.")
-                except Exception as e:
-                    st.error(f"❌ Error loading configuration: {str(e)}")
+    # Initialize step if not set
+    if 'step' not in st.session_state:
+        st.session_state.step = 1
     
-    # Regular step flow
-    elif st.session_state.step == 1:
+    # Step-by-step flow
+    if st.session_state.step == 1:
         show_excel_upload()
     elif st.session_state.step == 2:
         show_preferences_step()
