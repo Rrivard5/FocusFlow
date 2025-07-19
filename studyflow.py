@@ -24,429 +24,349 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced CSS with "Academic Excellence" color scheme
+# Enhanced CSS with color coding and 30-minute increments
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     .stApp {
         font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #1a365d 100%);
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
         min-height: 100vh;
         color: #ffffff;
     }
     
     .main-container {
-        background: rgba(255, 255, 255, 0.97);
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 2rem;
-        margin: 1rem;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: #2d3748;
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin: 0.5rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
     .app-title {
         text-align: center;
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #319795, #3182ce);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 1.5rem;
-        text-shadow: none;
+        color: #6c5ce7;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
     .setup-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(15px);
-        border-radius: 20px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        border: 1px solid rgba(49, 151, 149, 0.1);
-        color: #2d3748;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #ffffff;
     }
     
     .step-number {
         display: inline-block;
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #319795, #38b2ac);
+        width: 35px;
+        height: 35px;
+        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
         color: white;
         border-radius: 50%;
         text-align: center;
-        line-height: 40px;
-        font-weight: 700;
-        margin-right: 15px;
-        font-size: 1.1rem;
-        box-shadow: 0 4px 15px rgba(49, 151, 149, 0.3);
+        line-height: 35px;
+        font-weight: 600;
+        margin-right: 12px;
+        font-size: 1rem;
     }
     
     .course-card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        border: 1px solid rgba(49, 151, 149, 0.15);
-        color: #2d3748;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-    }
-    
-    .course-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 0.75rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #ffffff;
     }
     
     .course-code {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #319795;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #6c5ce7;
         margin-bottom: 0.5rem;
     }
     
     .course-name {
-        font-size: 1rem;
-        color: #4a5568;
-        margin-bottom: 1rem;
-        font-weight: 500;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 0.75rem;
     }
     
     .class-schedule {
-        background: rgba(49, 151, 149, 0.08);
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.75rem 0;
-        border-left: 4px solid #319795;
+        background: rgba(108, 92, 231, 0.1);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-left: 3px solid #6c5ce7;
     }
     
     .class-schedule-item {
-        color: #2d3748;
-        font-size: 0.95rem;
-        margin: 0.5rem 0;
-        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+        margin: 0.25rem 0;
     }
     
     .intramural-card {
-        background: rgba(237, 137, 54, 0.08);
-        border: 1px solid rgba(237, 137, 54, 0.2);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1.5rem 0;
-        color: #2d3748;
-        box-shadow: 0 8px 25px rgba(237, 137, 54, 0.1);
+        background: rgba(230, 126, 34, 0.1);
+        border: 1px solid rgba(230, 126, 34, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        color: #ffffff;
     }
     
     .intramural-card h4 {
-        color: #ed8936;
+        color: #e67e22;
         margin-bottom: 1rem;
-        font-size: 1.2rem;
-        font-weight: 700;
+        font-size: 1.1rem;
     }
     
     .activity-item {
-        background: rgba(237, 137, 54, 0.12);
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.75rem 0;
-        border-left: 4px solid #ed8936;
-        color: #2d3748;
-        font-weight: 500;
+        background: rgba(230, 126, 34, 0.15);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-left: 3px solid #e67e22;
+        color: #ffffff;
     }
     
     .wellness-info {
-        background: rgba(246, 224, 94, 0.12);
-        border: 1px solid rgba(246, 224, 94, 0.3);
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1.5rem 0;
-        color: #2d3748;
-        box-shadow: 0 8px 25px rgba(246, 224, 94, 0.15);
+        background: rgba(253, 203, 110, 0.1);
+        border: 1px solid rgba(253, 203, 110, 0.3);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        color: #ffffff;
     }
     
     .wellness-info h4 {
-        color: #d69e2e;
-        margin-bottom: 1rem;
-        font-size: 1.2rem;
-        font-weight: 700;
+        color: #fdcb6e;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
     }
     
     .wellness-info p {
-        color: #4a5568;
-        line-height: 1.6;
-        margin-bottom: 0.75rem;
-        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
     }
     
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 1.5rem;
-        margin: 2rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
     }
     
     .stat-card {
-        background: #ffffff;
+        background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(15px);
-        padding: 2rem;
-        border-radius: 16px;
+        padding: 1.5rem;
+        border-radius: 12px;
         text-align: center;
-        border: 1px solid rgba(49, 151, 149, 0.1);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-    }
-    
-    .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.15);
     }
     
     .stat-number {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: #319795;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #6c5ce7;
         display: block;
     }
     
     .stat-label {
-        font-size: 1rem;
-        color: #4a5568;
-        margin-top: 0.75rem;
-        font-weight: 600;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 0.5rem;
     }
     
     .progress-bar {
-        height: 8px;
-        background: rgba(49, 151, 149, 0.15);
-        border-radius: 8px;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
         overflow: hidden;
-        margin: 1.5rem 0;
+        margin: 1rem 0;
     }
     
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #319795, #38b2ac);
-        transition: width 0.5s ease;
-        border-radius: 8px;
+        background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+        transition: width 0.3s ease;
     }
     
     .progress-text {
         text-align: center;
-        color: #4a5568;
-        font-size: 1rem;
-        margin: 1rem 0;
-        font-weight: 600;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
     }
     
     .legend {
         display: flex;
         justify-content: center;
-        gap: 1.5rem;
-        margin: 1.5rem 0;
+        gap: 1rem;
+        margin: 1rem 0;
         flex-wrap: wrap;
     }
     
     .legend-item {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        font-size: 0.9rem;
-        color: #4a5568;
-        background: rgba(255, 255, 255, 0.8);
-        padding: 0.75rem 1rem;
-        border-radius: 25px;
-        font-weight: 600;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem 0.75rem;
+        border-radius: 20px;
     }
     
     .legend-color {
-        width: 18px;
-        height: 12px;
-        border-radius: 3px;
+        width: 16px;
+        height: 10px;
+        border-radius: 2px;
     }
     
     .week-nav {
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 1.5rem;
-        margin: 2rem 0;
+        gap: 1rem;
+        margin: 1.5rem 0;
     }
     
     .week-title {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #319795;
-        min-width: 200px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #6c5ce7;
+        min-width: 150px;
         text-align: center;
     }
     
-    /* Modern Button Styling */
+    /* Button styling - Clean black text on light backgrounds */
     .stButton > button {
         border: none !important;
-        border-radius: 16px !important;
-        padding: 1rem 2rem !important;
+        border-radius: 50px !important;
+        padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
         font-family: 'Inter', sans-serif !important;
         transition: all 0.3s ease !important;
         width: 100% !important;
-        background: linear-gradient(135deg, #319795, #38b2ac) !important;
-        color: #ffffff !important;
-        box-shadow: 0 8px 25px rgba(49, 151, 149, 0.25) !important;
-        text-transform: none !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        color: #2d3748 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+        border: 2px solid rgba(108, 92, 231, 0.3) !important;
     }
     
     .stButton > button:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 12px 35px rgba(49, 151, 149, 0.35) !important;
-        background: linear-gradient(135deg, #2c7a7b, #319795) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+        background: rgba(255, 255, 255, 1) !important;
+        color: #2d3748 !important;
+        border: 2px solid #6c5ce7 !important;
     }
     
     .stDownloadButton > button {
         border: none !important;
-        border-radius: 16px !important;
-        padding: 1rem 2rem !important;
+        border-radius: 50px !important;
+        padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
         font-family: 'Inter', sans-serif !important;
         transition: all 0.3s ease !important;
         width: 100% !important;
-        background: linear-gradient(135deg, #ed8936, #f6ad55) !important;
-        color: #ffffff !important;
-        box-shadow: 0 8px 25px rgba(237, 137, 54, 0.25) !important;
-        text-transform: none !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        color: #2d3748 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+        border: 2px solid rgba(0, 184, 148, 0.3) !important;
     }
     
     .stDownloadButton > button:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 12px 35px rgba(237, 137, 54, 0.35) !important;
-        background: linear-gradient(135deg, #dd6b20, #ed8936) !important;
-    }
-    
-    /* Form styling with modern aesthetics */
-    .stSelectbox label, .stTextInput label, .stSlider label, .stTimeInput label {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+        background: rgba(255, 255, 255, 1) !important;
         color: #2d3748 !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        font-family: 'Inter', sans-serif !important;
-        margin-bottom: 0.75rem !important;
+        border: 2px solid #00b894 !important;
     }
     
+    /* Fix button text visibility */
+    .stButton button p, .stDownloadButton button p {
+        color: #2d3748 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Form styling - Clean and readable */
     .stSelectbox > div > div {
-        background: #ffffff !important;
-        border: 2px solid rgba(49, 151, 149, 0.2) !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border: 2px solid rgba(200, 200, 200, 0.5) !important;
         border-radius: 12px !important;
         color: #2d3748 !important;
         font-family: 'Inter', sans-serif !important;
         font-weight: 500 !important;
-        padding: 1rem 1.25rem !important;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+        padding: 0.75rem 1rem !important;
     }
     
-    .stSelectbox > div > div:focus-within {
-        border-color: #319795 !important;
-        box-shadow: 0 0 0 3px rgba(49, 151, 149, 0.1) !important;
+    .stSelectbox > div > div > div {
+        color: #2d3748 !important;
+    }
+    
+    .stSelectbox div[data-baseweb="select"] > div {
+        color: #2d3748 !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    .stSelectbox [data-baseweb="select"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
     }
     
     .stTextInput > div > div > input {
-        background: #ffffff !important;
-        border: 2px solid rgba(49, 151, 149, 0.2) !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
         border-radius: 12px !important;
         color: #2d3748 !important;
         font-weight: 500 !important;
         font-family: 'Inter', sans-serif !important;
-        padding: 1rem 1.25rem !important;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
-    }
-    
-    .stTextInput > div > div > input:focus {
-        border-color: #319795 !important;
-        box-shadow: 0 0 0 3px rgba(49, 151, 149, 0.1) !important;
+        padding: 0.75rem 1rem !important;
     }
     
     .stFileUploader > div > div {
-        background: rgba(49, 151, 149, 0.08) !important;
-        border: 2px dashed rgba(49, 151, 149, 0.3) !important;
+        background: rgba(255, 255, 255, 0.15) !important;
+        border: 2px dashed rgba(255, 255, 255, 0.4) !important;
         border-radius: 20px !important;
-        color: #2d3748 !important;
+        color: #ffffff !important;
         font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        padding: 2rem !important;
-        text-align: center !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stFileUploader > div > div:hover {
-        background: rgba(49, 151, 149, 0.12) !important;
-        border-color: #319795 !important;
-    }
-    
-    .stFileUploader label {
-        color: #2d3748 !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    
-    /* Step headers with new styling */
-    h1, h2, h3 {
-        color: #2d3748 !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Info boxes */
-    .stInfo {
-        background: rgba(49, 151, 149, 0.08) !important;
-        border: 1px solid rgba(49, 151, 149, 0.2) !important;
-        border-radius: 12px !important;
-        color: #2d3748 !important;
-    }
-    
-    .stSuccess {
-        background: rgba(72, 187, 120, 0.08) !important;
-        border: 1px solid rgba(72, 187, 120, 0.2) !important;
-        border-radius: 12px !important;
-        color: #2d3748 !important;
-    }
-    
-    .stError {
-        background: rgba(245, 101, 101, 0.08) !important;
-        border: 1px solid rgba(245, 101, 101, 0.2) !important;
-        border-radius: 12px !important;
-        color: #2d3748 !important;
-    }
-    
-    /* Metrics styling */
-    .metric-container {
-        background: #ffffff !important;
-        border-radius: 12px !important;
+        font-weight: 500 !important;
         padding: 1.5rem !important;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
-        border: 1px solid rgba(49, 151, 149, 0.1) !important;
+        text-align: center !important;
     }
     
     @media (max-width: 768px) {
         .app-title {
-            font-size: 2rem;
+            font-size: 1.6rem;
         }
         
         .main-container {
-            margin: 0.5rem;
-            padding: 1.5rem;
+            margin: 0.25rem;
+            padding: 1rem;
         }
         
         .legend {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
         }
         
         .week-nav {
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
         }
     }
 </style>
