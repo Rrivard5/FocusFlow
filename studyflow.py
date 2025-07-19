@@ -637,17 +637,12 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
-    # Get start date from preferences or use current date
+    # Get start date from preferences - DON'T adjust it, trust user input
     start_date = preferences.get('start_date', datetime.now().date())
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
     
-    # Ensure start_date is a Monday
-    days_until_monday = start_date.weekday()
-    if days_until_monday != 0:
-        start_date = start_date - timedelta(days=days_until_monday)
-    
-    # Generate 4 weeks of schedule
+    # Generate 4 weeks of schedule starting from user's chosen date
     for week in range(4):
         weekly_schedule = {}
         week_start_date = start_date + timedelta(weeks=week)
@@ -746,22 +741,46 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                             class_type = class_time['type']
                             location = class_time.get('location', '')
                             
-                            # Convert times and fill schedule with proper rounding
+                            # Debug: Print class time info
+                            print(f"Processing {course['code']} {class_type} on {day}: {start_time} - {end_time}")
+                            
+                            # Convert times and fill schedule - IMPROVED PARSING
                             try:
-                                # Parse start and end times
-                                start_hour = int(start_time.split(':')[0])
-                                start_min = int(start_time.split(':')[1].split()[0])
-                                if 'PM' in start_time and start_hour != 12:
-                                    start_hour += 12
-                                elif 'AM' in start_time and start_hour == 12:
-                                    start_hour = 0
+                                # More robust time parsing
+                                def parse_time_better(time_str):
+                                    # Remove extra spaces and normalize
+                                    time_str = time_str.strip()
+                                    
+                                    # Handle formats like "1:55PM", "1:55 PM", "13:55"
+                                    if 'PM' in time_str.upper() or 'AM' in time_str.upper():
+                                        # 12-hour format
+                                        time_part = time_str.replace('PM', '').replace('AM', '').replace('pm', '').replace('am', '').strip()
+                                        is_pm = 'PM' in time_str.upper() or 'pm' in time_str
+                                        
+                                        if ':' in time_part:
+                                            hour, minute = map(int, time_part.split(':'))
+                                        else:
+                                            hour = int(time_part)
+                                            minute = 0
+                                        
+                                        if is_pm and hour != 12:
+                                            hour += 12
+                                        elif not is_pm and hour == 12:
+                                            hour = 0
+                                    else:
+                                        # 24-hour format or just hour
+                                        if ':' in time_str:
+                                            hour, minute = map(int, time_str.split(':'))
+                                        else:
+                                            hour = int(time_str)
+                                            minute = 0
+                                    
+                                    return hour, minute
                                 
-                                end_hour = int(end_time.split(':')[0])
-                                end_min = int(end_time.split(':')[1].split()[0])
-                                if 'PM' in end_time and end_hour != 12:
-                                    end_hour += 12
-                                elif 'AM' in end_time and end_hour == 12:
-                                    end_hour = 0
+                                start_hour, start_min = parse_time_better(start_time)
+                                end_hour, end_min = parse_time_better(end_time)
+                                
+                                print(f"Parsed times: {start_hour}:{start_min:02d} - {end_hour}:{end_min:02d}")
                                 
                                 # Round down start time to nearest 30 minutes (start earlier)
                                 if start_min > 0 and start_min <= 30:
@@ -776,7 +795,9 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                     end_min = 0
                                     end_hour += 1  # Round up to next hour
                                 
-                                # Find corresponding time slots
+                                print(f"Rounded times: {start_hour}:{start_min:02d} - {end_hour}:{end_min:02d}")
+                                
+                                # Find corresponding time slots and fill them
                                 for time_slot in time_slots:
                                     slot_hour = int(time_slot.split(':')[0])
                                     slot_min = int(time_slot.split(':')[1].split()[0])
@@ -800,7 +821,9 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                                 "type": "class",
                                                 "date": current_day_date
                                             }
-                            except:
+                                            print(f"Added class to slot: {time_slot}")
+                            except Exception as e:
+                                print(f"Error parsing time for {course['code']} {class_type}: {e}")
                                 continue
             
             weekly_schedule[day] = daily_schedule
@@ -810,9 +833,24 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     return schedule
 
 def create_schedule_dataframe(weekly_schedule):
-    """Create a pandas DataFrame for the schedule table"""
+    """Create a pandas DataFrame for the schedule table with dates"""
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    
+    # Get dates for the days (assuming they're stored in the schedule)
+    day_headers = []
+    for day in days:
+        if day in weekly_schedule and weekly_schedule[day]:
+            # Get date from any slot in that day
+            first_slot = list(weekly_schedule[day].keys())[0]
+            day_date = weekly_schedule[day][first_slot].get('date')
+            if day_date:
+                date_str = day_date.strftime('%m/%d')
+                day_headers.append(f"{day}\n{date_str}")
+            else:
+                day_headers.append(day)
+        else:
+            day_headers.append(day)
     
     # Create the dataframe
     data = []
@@ -824,7 +862,7 @@ def create_schedule_dataframe(weekly_schedule):
             row.append(activity)
         data.append(row)
     
-    df = pd.DataFrame(data, columns=["Time"] + days)
+    df = pd.DataFrame(data, columns=["Time"] + day_headers)
     return df
 
 def style_schedule_dataframe(df, weekly_schedule):
@@ -1292,14 +1330,8 @@ def show_preferences_step():
         start_date = st.date_input(
             "When does this schedule start?",
             value=datetime.now().date(),
-            help="Choose the Monday you want this schedule to begin"
+            help="Choose any day you want this schedule to begin"
         )
-        
-        # Adjust to nearest Monday
-        days_until_monday = (start_date.weekday()) % 7
-        if days_until_monday != 0:
-            start_date = start_date - timedelta(days=days_until_monday)
-            st.info(f"📅 Adjusted to Monday: {start_date.strftime('%B %d, %Y')}")
         
         st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
