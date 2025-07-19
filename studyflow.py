@@ -436,6 +436,131 @@ def parse_days_string(schedule_str):
     
     return days
 
+def create_excel_template():
+    """Create a sample Excel template for course data"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side
+    
+    wb = Workbook()
+    
+    # Remove default sheet
+    wb.remove(wb.active)
+    
+    # Create sample courses
+    sample_courses = [
+        {
+            'name': 'Course 1',
+            'data': [
+                ['Course title', 'Biology 101 - Introduction to Biology'],
+                ['Course Lecture Schedule', 'M,W,F 9:00-10:00am'],
+                ['Lecture location', 'Science Building Room 101'],
+                ['When in lab', 'T 2:00-4:00pm'],
+                ['Where is lab', 'Biology Lab Room 205'],
+                ['When is recitation', 'R 10:00-11:00am'],
+                ['Where is recitation', 'Study Hall Room 15'],
+                ['Suggested daily study time', '45 minutes'],
+                ['', ''],
+                ['Assignments:', ''],
+                ['Assignment 1', 'Lab Report 1', '9/15/2024', 'Lab Report'],
+                ['Assignment 2', 'Midterm Exam', '10/5/2024', 'Exam'],
+                ['Assignment 3', 'Research Paper', '11/20/2024', 'Paper']
+            ]
+        },
+        {
+            'name': 'Course 2', 
+            'data': [
+                ['Course title', 'Chemistry 101 - General Chemistry'],
+                ['Course Lecture Schedule', 'M,W,F 10:30-11:30am'],
+                ['Lecture location', 'Chemistry Building Room 150'],
+                ['When in lab', 'R 1:00-3:00pm'],
+                ['Where is lab', 'Chemistry Lab Room 220'],
+                ['When is recitation', 'N/A'],
+                ['Where is recitation', 'N/A'],
+                ['Suggested daily study time', '60 minutes'],
+                ['', ''],
+                ['Assignments:', ''],
+                ['Assignment 1', 'Problem Set 1', '9/10/2024', 'Homework'],
+                ['Assignment 2', 'Lab Practical', '10/12/2024', 'Lab'],
+                ['Assignment 3', 'Final Exam', '12/10/2024', 'Exam']
+            ]
+        },
+        {
+            'name': 'Course 3',
+            'data': [
+                ['Course title', 'Mathematics 201 - Calculus I'],
+                ['Course Lecture Schedule', 'T,R 11:00-12:30pm'],
+                ['Lecture location', 'Math Building Room 301'],
+                ['When in lab', 'N/A'],
+                ['Where is lab', 'N/A'],
+                ['When is recitation', 'F 2:00-3:00pm'],
+                ['Where is recitation', 'Math Building Room 105'],
+                ['Suggested daily study time', '90 minutes'],
+                ['', ''],
+                ['Assignments:', ''],
+                ['Assignment 1', 'Weekly Quiz 1', '9/8/2024', 'Quiz'],
+                ['Assignment 2', 'Midterm 1', '10/1/2024', 'Exam'],
+                ['Assignment 3', 'Project', '11/15/2024', 'Project']
+            ]
+        }
+    ]
+    
+    # Create sheets with styling
+    for course_info in sample_courses:
+        ws = wb.create_sheet(title=course_info['name'])
+        
+        # Header styling
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        # Add data
+        for row_idx, row_data in enumerate(course_info['data'], 1):
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = border
+                
+                # Style field names
+                if col_idx == 1 and value and 'Course' in str(value):
+                    cell.font = header_font
+                    cell.fill = header_fill
+        
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 15
+    
+    # Save to BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def load_config_from_json(json_data):
+    """Load configuration from JSON data"""
+    try:
+        config = json.loads(json_data)
+        
+        # Load courses
+        if 'courses' in config:
+            st.session_state.courses = config['courses']
+        
+        # Load intramurals  
+        if 'intramurals' in config:
+            st.session_state.intramurals = config['intramurals']
+        
+        # Load user data
+        if 'user_data' in config:
+            st.session_state.user_data = config['user_data']
+        
+        # Mark as having processed file data
+        st.session_state.file_processed = True
+        
+        return True
+    except Exception as e:
+        return False
+
 def parse_excel_course_file(file):
     """Parse the Excel file with the specified format using pandas - memory optimized"""
     try:
@@ -591,15 +716,82 @@ def generate_time_slots():
     return time_slots
 
 def time_to_slot_index(time_str):
-    """Convert time string to slot index"""
+    """Convert time string to slot index with better parsing"""
     time_slots = generate_time_slots()
+    
+    # First try exact match
     try:
         return time_slots.index(time_str)
     except ValueError:
-        # Try to find closest match
-        for i, slot in enumerate(time_slots):
-            if time_str in slot:
-                return i
+        pass
+    
+    # Try to parse and convert the time
+    try:
+        # Remove extra spaces
+        time_str = time_str.strip()
+        
+        # Handle formats like "5:00 PM", "17:00", etc.
+        if 'PM' in time_str.upper() or 'AM' in time_str.upper():
+            # 12-hour format
+            time_part = time_str.replace('PM', '').replace('AM', '').replace('pm', '').replace('am', '').strip()
+            is_pm = 'PM' in time_str.upper() or 'pm' in time_str
+            
+            if ':' in time_part:
+                hour, minute = map(int, time_part.split(':'))
+            else:
+                hour = int(time_part)
+                minute = 0
+            
+            if is_pm and hour != 12:
+                hour += 12
+            elif not is_pm and hour == 12:
+                hour = 0
+        else:
+            # 24-hour format
+            if ':' in time_str:
+                hour, minute = map(int, time_str.split(':'))
+            else:
+                hour = int(time_str)
+                minute = 0
+        
+        # Convert to standard format and find in slots
+        if hour == 0:
+            standard_time = f"12:{minute:02d} AM"
+        elif hour < 12:
+            standard_time = f"{hour}:{minute:02d} AM"
+        elif hour == 12:
+            standard_time = f"12:{minute:02d} PM"
+        else:
+            standard_time = f"{hour-12}:{minute:02d} PM"
+        
+        # Try to find this time in slots
+        try:
+            return time_slots.index(standard_time)
+        except ValueError:
+            # Find closest time slot
+            target_minutes = hour * 60 + minute
+            closest_index = 0
+            closest_diff = float('inf')
+            
+            for i, slot in enumerate(time_slots):
+                slot_hour = int(slot.split(':')[0])
+                slot_min = int(slot.split(':')[1].split()[0])
+                if 'PM' in slot and slot_hour != 12:
+                    slot_hour += 12
+                elif 'AM' in slot and slot_hour == 12:
+                    slot_hour = 0
+                
+                slot_minutes = slot_hour * 60 + slot_min
+                diff = abs(slot_minutes - target_minutes)
+                
+                if diff < closest_diff:
+                    closest_diff = diff
+                    closest_index = i
+            
+            return closest_index
+    
+    except Exception as e:
+        print(f"Error parsing time {time_str}: {e}")
         return 0
 
 def generate_weekly_schedule(courses, intramurals, preferences):
@@ -715,9 +907,32 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                             print(f"Error parsing time for {course['code']} {class_type}: {e}")
                             continue
         
-        # STEP 2: Add sleep schedule and end-of-day "Go to Sleep" (only in free slots)
+        # STEP 2: Add intramural activities SECOND (student-specified times get priority)
+        for intramural in intramurals:
+            if intramural.get('scheduled') and day in intramural.get('days', []):
+                start_time = intramural.get('start_time', '5:00 PM')
+                duration = intramural.get('duration', 90)  # minutes
+                
+                try:
+                    start_slot = time_to_slot_index(start_time)
+                    slots_needed = duration // 30
+                    
+                    for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
+                        if i < len(time_slots):
+                            slot_time = time_slots[i]
+                            # Add intramural regardless of what's there (except classes)
+                            if daily_schedule[slot_time]["type"] != "class":
+                                daily_schedule[slot_time] = {
+                                    "activity": f"{intramural['name']} - {intramural['type']}",
+                                    "type": "activity",
+                                    "date": current_day_date
+                                }
+                except:
+                    continue
+        
+        # STEP 3: Add sleep schedule and end-of-day "Go to Sleep" (only in free slots)
         wake_time = preferences.get('wake_time', 8)
-        bedtime = preferences.get('bedtime', 11)
+        bedtime = preferences.get('bedtime', 23)  # Using 24-hour format now
         
         # Fill sleep times
         for time_slot in time_slots:
@@ -740,7 +955,7 @@ def generate_weekly_schedule(courses, intramurals, preferences):
             go_to_sleep_hour = bedtime
             go_to_sleep_time = f"{go_to_sleep_hour - 12}:30 PM" if bedtime > 12 else f"{bedtime}:30 PM"
         elif bedtime <= 2:  # If bedtime is early morning (like 1 AM = bedtime_hour of 1)  
-            go_to_sleep_hour = bedtime + 12
+            go_to_sleep_hour = bedtime
             go_to_sleep_time = f"{go_to_sleep_hour}:30 AM"
         else:
             go_to_sleep_hour = bedtime
@@ -752,46 +967,34 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         if go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
         
-        # STEP 3: Add meals (only in free slots)
+        # STEP 4: Add meals (only in free slots, but try to be flexible)
         meal_times = {
             "8:00 AM": "Breakfast",
             "12:00 PM": "Lunch", 
             "6:00 PM": "Dinner"
         }
         
+        # Try primary meal times first
         for meal_time, meal_name in meal_times.items():
             if meal_time in daily_schedule and daily_schedule[meal_time]["type"] == "free":
                 daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
         
-        # STEP 4: Add intramural activities (only in free slots)
-        for intramural in intramurals:
-            if intramural.get('scheduled') and day in intramural.get('days', []):
-                start_time = intramural.get('start_time', '5:00 PM')
-                duration = intramural.get('duration', 90)  # minutes
-                
-                try:
-                    start_slot = time_to_slot_index(start_time)
-                    slots_needed = duration // 30
-                    
-                    for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
-                        if i < len(time_slots):
-                            slot_time = time_slots[i]
-                            # Only add if free
-                            if daily_schedule[slot_time]["type"] == "free":
-                                daily_schedule[slot_time] = {
-                                    "activity": f"{intramural['name']} - {intramural['type']}",
-                                    "type": "activity",
-                                    "date": current_day_date
-                                }
-                except:
-                    continue
+        # If dinner was blocked by activities, try to find alternative dinner time
+        dinner_scheduled = any(slot["activity"] == "Dinner" for slot in daily_schedule.values())
+        if not dinner_scheduled:
+            # Try alternative dinner times
+            alt_dinner_times = ["5:30 PM", "6:30 PM", "7:00 PM", "7:30 PM"]
+            for alt_time in alt_dinner_times:
+                if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "free":
+                    daily_schedule[alt_time] = {"activity": "Dinner", "type": "meal", "date": current_day_date}
+                    break
         
         # STEP 5: Add study sessions with variety (only in free slots)
         if not is_weekend:
-            study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
+            study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM", "8:00 PM"]
         else:
             # More studying on weekends
-            study_times = ["10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM"]
+            study_times = ["10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM", "8:00 PM"]
         
         # Create a balanced study schedule with variety
         if courses:
@@ -817,6 +1020,27 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                             "date": current_day_date
                         }
                         study_session_count += 1
+            
+            # If some study sessions were blocked by activities, try alternative times
+            scheduled_study_count = sum(1 for slot in daily_schedule.values() if slot["type"] == "study")
+            target_study_sessions = 4 if not is_weekend else 6
+            
+            if scheduled_study_count < target_study_sessions:
+                # Try alternative study times
+                alt_study_times = ["9:00 AM", "1:00 PM", "3:00 PM", "8:30 PM", "9:00 PM"]
+                for alt_time in alt_study_times:
+                    if (alt_time in daily_schedule and 
+                        daily_schedule[alt_time]["type"] == "free" and 
+                        scheduled_study_count < target_study_sessions):
+                        if study_session_count < len(course_pool):
+                            chosen_course = course_pool[study_session_count % len(course_pool)]
+                            daily_schedule[alt_time] = {
+                                "activity": f"{chosen_course['code']} - Study Time",
+                                "type": "study",
+                                "date": current_day_date
+                            }
+                            study_session_count += 1
+                            scheduled_study_count += 1
         
         # STEP 6: Add breaks (only in free slots)
         break_times = ["10:30 AM", "3:30 PM"]
@@ -945,7 +1169,6 @@ def generate_pdf_schedule(schedule_data, user_data):
     
     # Important reminders section
     story.append(Paragraph("📋 Important Reminders", ParagraphStyle('RemindersHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
-    story.append(Paragraph("• <b>Reusable template:</b> This weekly schedule can be repeated throughout your semester - adjust as needed for different weeks.", wellness_style))
     story.append(Paragraph("• <b>Sleep is crucial:</b> This schedule prioritizes 7-9 hours of sleep for optimal learning and memory consolidation.", wellness_style))
     story.append(Paragraph("• <b>Sample schedule:</b> This is one possible arrangement. Modify times and activities based on your needs and preferences.", wellness_style))
     story.append(Paragraph("• <b>Flexibility matters:</b> Use 'buffer time' between classes for walking, transitions, or short breaks.", wellness_style))
@@ -1075,9 +1298,64 @@ def show_excel_upload():
     st.markdown("""
     <div style="background: rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
         <h2 style="color: #6c5ce7; margin-bottom: 0.5rem;">📚 Step 1: Course Information</h2>
-        <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Upload Excel file or add courses manually</p>
+        <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Upload Excel file, import configuration, or add courses manually</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Add import/download options at the top
+    st.markdown("### 📥 Import or Download Template")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Download template button
+        template_buffer = create_excel_template()
+        st.download_button(
+            label="📄 Download Excel Template",
+            data=template_buffer.getvalue(),
+            file_name="FocusFlow_Course_Template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Download a sample Excel template to fill out with your course information"
+        )
+    
+    with col2:
+        # Import configuration
+        uploaded_config = st.file_uploader(
+            "Import Saved Configuration",
+            type=['json'],
+            help="Upload a previously saved FocusFlow configuration file",
+            key="config_upload"
+        )
+        
+        if uploaded_config is not None:
+            try:
+                config_data = uploaded_config.read().decode('utf-8')
+                if load_config_from_json(config_data):
+                    st.success("✅ Configuration loaded successfully!")
+                    # Skip to step 2 if user data is also loaded
+                    if st.session_state.get('user_data'):
+                        if st.button("🚀 Go to Schedule Generation"):
+                            st.session_state.step = 3
+                            # Generate schedule with loaded data
+                            schedule = generate_weekly_schedule(
+                                st.session_state.courses,
+                                st.session_state.intramurals,
+                                st.session_state.user_data
+                            )
+                            st.session_state.final_schedule = schedule
+                            st.rerun()
+                    else:
+                        if st.button("➡️ Continue to Preferences"):
+                            st.session_state.step = 2
+                            st.rerun()
+                else:
+                    st.error("❌ Could not load configuration file. Please check the format.")
+            except Exception as e:
+                st.error(f"❌ Error loading configuration: {str(e)}")
+    
+    # Separator
+    if not st.session_state.get('file_processed', False):
+        st.markdown("---")
     
     # Show current courses if any
     if st.session_state.courses:
@@ -1385,12 +1663,14 @@ def show_preferences_step():
         st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
         
-        # Bedtime with AM/PM
+        # Bedtime with AM/PM display
         bedtime_hour = st.slider("Bedtime hour", 9, 2, 11)
         if bedtime_hour >= 9:
             bedtime_display = f"{bedtime_hour}:00 PM"
+            bedtime_actual = bedtime_hour  # 21, 22, 23 for 9PM, 10PM, 11PM
         else:
             bedtime_display = f"{bedtime_hour}:00 AM"
+            bedtime_actual = bedtime_hour + 24  # 25, 26 for 1AM, 2AM
         
         st.write(f"**Bedtime: {bedtime_display}**")
         
@@ -1464,6 +1744,7 @@ def show_preferences_step():
         
         # Parse and sort assignments by date
         upcoming_assignments = []
+        start_date = datetime.now().date()
         for assignment in st.session_state.assignments:
             try:
                 # Try to parse the date
@@ -1515,10 +1796,10 @@ def show_preferences_step():
     </div>
     """, unsafe_allow_html=True)
     
-    # Store preferences (removed start_date since it's no longer needed)
+    # Store preferences (using bedtime_actual for calculations)
     preferences = {
         'wake_time': wake_time,
-        'bedtime': bedtime_hour,
+        'bedtime': bedtime_actual,
         'study_intensity': study_intensity,
         'include_intramurals': include_intramurals
     }
