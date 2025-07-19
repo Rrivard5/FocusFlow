@@ -913,13 +913,19 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                 start_time = intramural.get('start_time', '5:00 PM')
                 duration = intramural.get('duration', 90)  # minutes
                 
+                print(f"Processing intramural: {intramural['name']} on {day} at {start_time} for {duration} minutes")
+                
                 try:
                     start_slot = time_to_slot_index(start_time)
-                    slots_needed = duration // 30
+                    slots_needed = max(1, duration // 30)  # Ensure at least 1 slot
+                    
+                    print(f"Start slot index: {start_slot}, Slots needed: {slots_needed}")
                     
                     for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
                         if i < len(time_slots):
                             slot_time = time_slots[i]
+                            print(f"Trying to add activity to slot: {slot_time} (current type: {daily_schedule[slot_time]['type']})")
+                            
                             # Add intramural regardless of what's there (except classes)
                             if daily_schedule[slot_time]["type"] != "class":
                                 daily_schedule[slot_time] = {
@@ -927,7 +933,11 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                     "type": "activity",
                                     "date": current_day_date
                                 }
-                except:
+                                print(f"Successfully added activity to slot: {slot_time}")
+                            else:
+                                print(f"Slot {slot_time} blocked by class: {daily_schedule[slot_time]['activity']}")
+                except Exception as e:
+                    print(f"Error processing intramural {intramural['name']}: {e}")
                     continue
         
         # STEP 3: Add sleep schedule and end-of-day "Go to Sleep" (only in free slots)
@@ -1714,6 +1724,10 @@ def show_preferences_step():
                 }
                 st.session_state.intramurals.append(intramural)
                 st.success(f"✅ Added {activity_name}!")
+                
+                # Debug: Show what was added
+                st.write(f"**Debug Info:** Added activity with scheduled={is_scheduled}, days={selected_days if is_scheduled else []}")
+                
                 st.rerun()
         
         # Show added intramurals
@@ -1724,7 +1738,7 @@ def show_preferences_step():
             </div>
             """, unsafe_allow_html=True)
             
-            for intramural in st.session_state.intramurals:
+            for i, intramural in enumerate(st.session_state.intramurals):
                 schedule_info = ""
                 if intramural.get('scheduled'):
                     days = ", ".join(intramural.get('days', []))
@@ -1735,8 +1749,14 @@ def show_preferences_step():
                 st.markdown(f"""
                 <div class="activity-item">
                     <strong>{intramural['name']}</strong> ({intramural['type']}){schedule_info}
+                    <br><small>Scheduled: {intramural.get('scheduled', False)} | Days: {intramural.get('days', [])}</small>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Add delete button for each activity
+                if st.button(f"🗑️ Delete {intramural['name']}", key=f"delete_activity_{i}"):
+                    st.session_state.intramurals.pop(i)
+                    st.rerun()
     
     # Show upcoming assignments if any
     if st.session_state.get('assignments'):
@@ -1867,6 +1887,26 @@ def show_schedule_step():
     if st.session_state.final_schedule:
         df = create_schedule_dataframe(st.session_state.final_schedule)
         styled_df = style_schedule_dataframe(df, st.session_state.final_schedule)
+        
+        # Debug section - show what activities were processed
+        if st.session_state.intramurals:
+            with st.expander("🔍 Debug: Activity Processing"):
+                st.write("**Intramural activities in session state:**")
+                for i, activity in enumerate(st.session_state.intramurals):
+                    st.write(f"{i+1}. {activity}")
+                
+                # Check if activities appear in the schedule
+                st.write("**Activities found in schedule:**")
+                activity_found = False
+                for day, schedule in st.session_state.final_schedule.items():
+                    for time_slot, slot_data in schedule.items():
+                        if slot_data["type"] == "activity":
+                            st.write(f"- {day} {time_slot}: {slot_data['activity']}")
+                            activity_found = True
+                
+                if not activity_found:
+                    st.error("❌ No activities found in the generated schedule!")
+                    st.write("This suggests an issue with the scheduling algorithm.")
         
         # Display the schedule table
         st.dataframe(
