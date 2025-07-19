@@ -637,19 +637,31 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
+    # Get start date from preferences or use current date
+    start_date = preferences.get('start_date', datetime.now().date())
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    # Ensure start_date is a Monday
+    days_until_monday = start_date.weekday()
+    if days_until_monday != 0:
+        start_date = start_date - timedelta(days=days_until_monday)
+    
     # Generate 4 weeks of schedule
     for week in range(4):
         weekly_schedule = {}
+        week_start_date = start_date + timedelta(weeks=week)
         
-        for day in days:
+        for day_index, day in enumerate(days):
             daily_schedule = {}
             is_weekend = day in ["Saturday", "Sunday"]
+            current_day_date = week_start_date + timedelta(days=day_index)
             
             # Initialize all slots as free
             for time_slot in time_slots:
-                daily_schedule[time_slot] = {"activity": "Free Time", "type": "free"}
+                daily_schedule[time_slot] = {"activity": "Free Time", "type": "free", "date": current_day_date}
             
-            # Add sleep schedule
+            # Add sleep schedule FIRST
             wake_time = preferences.get('wake_time', 8)
             bedtime = preferences.get('bedtime', 11)
             
@@ -666,9 +678,65 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                 
                 # Sleep from bedtime to wake time
                 if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
-                    daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep"}
+                    daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
             
-            # Add class times from Excel data
+            # Add meals SECOND (but only if not sleeping)
+            meal_times = {
+                "8:00 AM": "Breakfast",
+                "12:00 PM": "Lunch", 
+                "6:00 PM": "Dinner"
+            }
+            
+            for meal_time, meal_name in meal_times.items():
+                if meal_time in daily_schedule and daily_schedule[meal_time]["type"] != "sleep":
+                    daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+            
+            # Add intramural activities THIRD (but only if not sleeping or eating)
+            for intramural in intramurals:
+                if intramural.get('scheduled') and day in intramural.get('days', []):
+                    start_time = intramural.get('start_time', '5:00 PM')
+                    duration = intramural.get('duration', 90)  # minutes
+                    
+                    try:
+                        start_slot = time_to_slot_index(start_time)
+                        slots_needed = duration // 30
+                        
+                        for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
+                            if i < len(time_slots):
+                                slot_time = time_slots[i]
+                                # Only add if not sleep or meal
+                                if daily_schedule[slot_time]["type"] not in ["sleep", "meal"]:
+                                    daily_schedule[slot_time] = {
+                                        "activity": f"{intramural['name']} - {intramural['type']}",
+                                        "type": "activity",
+                                        "date": current_day_date
+                                    }
+                    except:
+                        continue
+            
+            # Add study sessions FOURTH (only in free slots)
+            if not is_weekend:
+                study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
+            else:
+                study_times = ["10:00 AM", "2:00 PM"]
+            
+            for study_time in study_times:
+                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
+                    if courses:
+                        course = random.choice(courses)
+                        daily_schedule[study_time] = {
+                            "activity": f"{course['code']} - Study Time",
+                            "type": "study",
+                            "date": current_day_date
+                        }
+            
+            # Add breaks FIFTH (only in free slots)
+            break_times = ["10:30 AM", "3:30 PM"]
+            for break_time in break_times:
+                if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
+                    daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break", "date": current_day_date}
+            
+            # Add class times LAST - HIGHEST PRIORITY (overrides everything except sleep)
             for course in courses:
                 if 'class_schedule' in course:
                     for class_time in course['class_schedule']:
@@ -722,68 +790,18 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                     end_time_min = end_hour * 60 + end_min
                                     
                                     if start_time_min <= slot_time < end_time_min:
-                                        activity_name = f"{course['code']} - {class_type}"
-                                        if location:
-                                            activity_name += f" ({location})"
-                                        daily_schedule[time_slot] = {
-                                            "activity": activity_name,
-                                            "type": "class"
-                                        }
+                                        # Classes override everything except sleep
+                                        if daily_schedule[time_slot]["type"] != "sleep":
+                                            activity_name = f"{course['code']} - {class_type}"
+                                            if location:
+                                                activity_name += f" ({location})"
+                                            daily_schedule[time_slot] = {
+                                                "activity": activity_name,
+                                                "type": "class",
+                                                "date": current_day_date
+                                            }
                             except:
                                 continue
-            
-            # Add intramural activities
-            for intramural in intramurals:
-                if intramural.get('scheduled') and day in intramural.get('days', []):
-                    start_time = intramural.get('start_time', '5:00 PM')
-                    duration = intramural.get('duration', 90)  # minutes
-                    
-                    try:
-                        start_slot = time_to_slot_index(start_time)
-                        slots_needed = duration // 30
-                        
-                        for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
-                            if i < len(time_slots):
-                                daily_schedule[time_slots[i]] = {
-                                    "activity": f"{intramural['name']} - {intramural['type']}",
-                                    "type": "activity"
-                                }
-                    except:
-                        continue
-            
-            # Add meals
-            meal_times = {
-                "8:00 AM": "Breakfast",
-                "12:00 PM": "Lunch", 
-                "6:00 PM": "Dinner"
-            }
-            
-            for meal_time, meal_name in meal_times.items():
-                if meal_time in daily_schedule:
-                    daily_schedule[meal_time] = {"activity": meal_name, "type": "meal"}
-            
-            # Add study sessions based on course recommendations
-            if not is_weekend:
-                study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
-            else:
-                study_times = ["10:00 AM", "2:00 PM"]
-            
-            for study_time in study_times:
-                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
-                    if courses:
-                        course = random.choice(courses)
-                        study_types = ['Reading', 'Practice', 'Review', 'Homework']
-                        study_type = random.choice(study_types)
-                        daily_schedule[study_time] = {
-                            "activity": f"{course['code']} - {study_type}",
-                            "type": "study"
-                        }
-            
-            # Add breaks
-            break_times = ["10:30 AM", "3:30 PM"]
-            for break_time in break_times:
-                if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
-                    daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break"}
             
             weekly_schedule[day] = daily_schedule
         
@@ -837,7 +855,7 @@ def style_schedule_dataframe(df, weekly_schedule):
     return df.style.applymap(color_cell, subset=df.columns[1:])
 
 def generate_pdf_schedule(schedule_data, user_data):
-    """Generate a PDF schedule with wellness reminders"""
+    """Generate a PDF schedule with wellness reminders and study strategies"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
     
@@ -874,6 +892,17 @@ def generate_pdf_schedule(schedule_data, user_data):
     story.append(Paragraph("• <b>Sample schedule:</b> This is one possible arrangement. Adjust times and activities based on your needs and preferences.", wellness_style))
     story.append(Paragraph("• <b>Flexibility matters:</b> Use 'buffer time' between classes for walking, transitions, or short breaks.", wellness_style))
     story.append(Paragraph("• <b>Balance is key:</b> Notice how study time is balanced with meals, exercise, and relaxation.", wellness_style))
+    story.append(Spacer(1, 16))
+    
+    # Add evidence-based study strategies
+    story.append(Paragraph("📚 Evidence-Based Study Strategies", styles['Heading2']))
+    story.append(Paragraph("<b>Active Recall:</b> Test yourself regularly instead of just re-reading. Use flashcards, practice questions, or explain concepts out loud.", wellness_style))
+    story.append(Paragraph("<b>Spaced Repetition:</b> Review material at increasing intervals (1 day, 3 days, 1 week, 2 weeks) for better retention.", wellness_style))
+    story.append(Paragraph("<b>Pomodoro Technique:</b> Study for 25 minutes, then take a 5-minute break. After 4 cycles, take a longer 15-30 minute break.", wellness_style))
+    story.append(Paragraph("<b>Interleaving:</b> Mix different topics or types of problems in one study session rather than studying one subject for hours.", wellness_style))
+    story.append(Paragraph("<b>Elaboration:</b> Connect new information to what you already know. Ask 'why' and 'how' questions.", wellness_style))
+    story.append(Paragraph("<b>Dual Coding:</b> Use both visual and verbal information - draw diagrams, create mind maps, use charts and graphs.", wellness_style))
+    story.append(Paragraph("<b>Practice Testing:</b> Take practice exams under timed conditions to simulate real testing scenarios.", wellness_style))
     story.append(Spacer(1, 16))
     
     # Add schedule tables for each week
@@ -1259,6 +1288,19 @@ def show_preferences_step():
     col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown("### 📅 Schedule Dates")
+        start_date = st.date_input(
+            "When does this schedule start?",
+            value=datetime.now().date(),
+            help="Choose the Monday you want this schedule to begin"
+        )
+        
+        # Adjust to nearest Monday
+        days_until_monday = (start_date.weekday()) % 7
+        if days_until_monday != 0:
+            start_date = start_date - timedelta(days=days_until_monday)
+            st.info(f"📅 Adjusted to Monday: {start_date.strftime('%B %d, %Y')}")
+        
         st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
         
@@ -1335,6 +1377,52 @@ def show_preferences_step():
                 </div>
                 """, unsafe_allow_html=True)
     
+    # Show upcoming assignments if any
+    if st.session_state.get('assignments'):
+        st.markdown("### 📋 Upcoming Assignments")
+        
+        # Parse and sort assignments by date
+        upcoming_assignments = []
+        for assignment in st.session_state.assignments:
+            try:
+                # Try to parse the date
+                date_str = assignment.get('date', '')
+                if date_str and date_str.lower() != 'n/a':
+                    # Handle various date formats
+                    possible_formats = ['%m/%d/%Y', '%m-%d-%Y', '%Y-%m-%d', '%B %d, %Y', '%b %d, %Y']
+                    parsed_date = None
+                    
+                    for fmt in possible_formats:
+                        try:
+                            parsed_date = datetime.strptime(date_str, fmt).date()
+                            break
+                        except:
+                            continue
+                    
+                    if parsed_date and parsed_date >= start_date:
+                        weeks_from_start = (parsed_date - start_date).days // 7
+                        if weeks_from_start < 4:  # Only show assignments in the 4-week period
+                            assignment['parsed_date'] = parsed_date
+                            assignment['week_number'] = weeks_from_start + 1
+                            upcoming_assignments.append(assignment)
+            except:
+                continue
+        
+        if upcoming_assignments:
+            upcoming_assignments.sort(key=lambda x: x['parsed_date'])
+            
+            for assignment in upcoming_assignments[:10]:  # Show first 10
+                date_str = assignment['parsed_date'].strftime('%B %d, %Y')
+                week_str = f"Week {assignment['week_number']}"
+                priority_emoji = "🔴" if assignment.get('priority') == 'high' else "🟡" if assignment.get('priority') == 'medium' else "🟢"
+                
+                st.markdown(f"""
+                <div style="background: rgba(108, 92, 231, 0.1); padding: 0.5rem; margin: 0.25rem 0; border-radius: 8px; border-left: 3px solid #6c5ce7;">
+                    {priority_emoji} <strong>{assignment['course']}</strong> - {assignment['title']}<br>
+                    <small>📅 {date_str} ({week_str})</small>
+                </div>
+                """, unsafe_allow_html=True)
+    
     # Wellness information
     st.markdown("""
     <div class="wellness-info">
@@ -1348,6 +1436,7 @@ def show_preferences_step():
     
     # Store preferences
     preferences = {
+        'start_date': start_date,
         'wake_time': wake_time,
         'bedtime': bedtime_hour,
         'study_intensity': study_intensity,
