@@ -652,86 +652,22 @@ def generate_weekly_schedule(courses, intramurals, preferences):
             is_weekend = day in ["Saturday", "Sunday"]
             current_day_date = week_start_date + timedelta(days=day_index)
             
-            # Initialize all slots as free
+            # Check if this day is before the start date
+            is_before_start = current_day_date < start_date
+            
+            # Initialize all slots
             for time_slot in time_slots:
-                daily_schedule[time_slot] = {"activity": "Free Time", "type": "free", "date": current_day_date}
+                if is_before_start:
+                    daily_schedule[time_slot] = {"activity": "", "type": "blank", "date": current_day_date}
+                else:
+                    daily_schedule[time_slot] = {"activity": "Free Time", "type": "free", "date": current_day_date}
             
-            # Add sleep schedule FIRST
-            wake_time = preferences.get('wake_time', 8)
-            bedtime = preferences.get('bedtime', 11)
+            # Skip everything else if before start date
+            if is_before_start:
+                weekly_schedule[day] = daily_schedule
+                continue
             
-            # Fill sleep times
-            for time_slot in time_slots:
-                hour = int(time_slot.split(':')[0])
-                is_pm = 'PM' in time_slot
-                is_am = 'AM' in time_slot
-                
-                if is_pm and hour != 12:
-                    hour += 12
-                elif is_am and hour == 12:
-                    hour = 0
-                
-                # Sleep from bedtime to wake time
-                if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
-                    daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
-            
-            # Add meals SECOND (but only if not sleeping)
-            meal_times = {
-                "8:00 AM": "Breakfast",
-                "12:00 PM": "Lunch", 
-                "6:00 PM": "Dinner"
-            }
-            
-            for meal_time, meal_name in meal_times.items():
-                if meal_time in daily_schedule and daily_schedule[meal_time]["type"] != "sleep":
-                    daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
-            
-            # Add intramural activities THIRD (but only if not sleeping or eating)
-            for intramural in intramurals:
-                if intramural.get('scheduled') and day in intramural.get('days', []):
-                    start_time = intramural.get('start_time', '5:00 PM')
-                    duration = intramural.get('duration', 90)  # minutes
-                    
-                    try:
-                        start_slot = time_to_slot_index(start_time)
-                        slots_needed = duration // 30
-                        
-                        for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
-                            if i < len(time_slots):
-                                slot_time = time_slots[i]
-                                # Only add if not sleep or meal
-                                if daily_schedule[slot_time]["type"] not in ["sleep", "meal"]:
-                                    daily_schedule[slot_time] = {
-                                        "activity": f"{intramural['name']} - {intramural['type']}",
-                                        "type": "activity",
-                                        "date": current_day_date
-                                    }
-                    except:
-                        continue
-            
-            # Add study sessions FOURTH (only in free slots)
-            if not is_weekend:
-                study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
-            else:
-                study_times = ["10:00 AM", "2:00 PM"]
-            
-            for study_time in study_times:
-                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
-                    if courses:
-                        course = random.choice(courses)
-                        daily_schedule[study_time] = {
-                            "activity": f"{course['code']} - Study Time",
-                            "type": "study",
-                            "date": current_day_date
-                        }
-            
-            # Add breaks FIFTH (only in free slots)
-            break_times = ["10:30 AM", "3:30 PM"]
-            for break_time in break_times:
-                if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
-                    daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break", "date": current_day_date}
-            
-            # Add class times LAST - HIGHEST PRIORITY (overrides everything except sleep)
+            # STEP 1: Add class times FIRST - HIGHEST PRIORITY
             for course in courses:
                 if 'class_schedule' in course:
                     for class_time in course['class_schedule']:
@@ -811,20 +747,94 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                     end_time_min = end_hour * 60 + end_min
                                     
                                     if start_time_min <= slot_time < end_time_min:
-                                        # Classes override everything except sleep
-                                        if daily_schedule[time_slot]["type"] != "sleep":
-                                            activity_name = f"{course['code']} - {class_type}"
-                                            if location:
-                                                activity_name += f" ({location})"
-                                            daily_schedule[time_slot] = {
-                                                "activity": activity_name,
-                                                "type": "class",
-                                                "date": current_day_date
-                                            }
-                                            print(f"Added class to slot: {time_slot}")
+                                        activity_name = f"{course['code']} - {class_type}"
+                                        if location:
+                                            activity_name += f" ({location})"
+                                        daily_schedule[time_slot] = {
+                                            "activity": activity_name,
+                                            "type": "class",
+                                            "date": current_day_date
+                                        }
+                                        print(f"Added class to slot: {time_slot}")
                             except Exception as e:
                                 print(f"Error parsing time for {course['code']} {class_type}: {e}")
                                 continue
+            
+            # STEP 2: Add sleep schedule (only in free slots)
+            wake_time = preferences.get('wake_time', 8)
+            bedtime = preferences.get('bedtime', 11)
+            
+            # Fill sleep times
+            for time_slot in time_slots:
+                if daily_schedule[time_slot]["type"] == "free":  # Only if free
+                    hour = int(time_slot.split(':')[0])
+                    is_pm = 'PM' in time_slot
+                    is_am = 'AM' in time_slot
+                    
+                    if is_pm and hour != 12:
+                        hour += 12
+                    elif is_am and hour == 12:
+                        hour = 0
+                    
+                    # Sleep from bedtime to wake time
+                    if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
+                        daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
+            
+            # STEP 3: Add meals (only in free slots)
+            meal_times = {
+                "8:00 AM": "Breakfast",
+                "12:00 PM": "Lunch", 
+                "6:00 PM": "Dinner"
+            }
+            
+            for meal_time, meal_name in meal_times.items():
+                if meal_time in daily_schedule and daily_schedule[meal_time]["type"] == "free":
+                    daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+            
+            # STEP 4: Add intramural activities (only in free slots)
+            for intramural in intramurals:
+                if intramural.get('scheduled') and day in intramural.get('days', []):
+                    start_time = intramural.get('start_time', '5:00 PM')
+                    duration = intramural.get('duration', 90)  # minutes
+                    
+                    try:
+                        start_slot = time_to_slot_index(start_time)
+                        slots_needed = duration // 30
+                        
+                        for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
+                            if i < len(time_slots):
+                                slot_time = time_slots[i]
+                                # Only add if free
+                                if daily_schedule[slot_time]["type"] == "free":
+                                    daily_schedule[slot_time] = {
+                                        "activity": f"{intramural['name']} - {intramural['type']}",
+                                        "type": "activity",
+                                        "date": current_day_date
+                                    }
+                    except:
+                        continue
+            
+            # STEP 5: Add study sessions (only in free slots)
+            if not is_weekend:
+                study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
+            else:
+                study_times = ["10:00 AM", "2:00 PM"]
+            
+            for study_time in study_times:
+                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
+                    if courses:
+                        course = random.choice(courses)
+                        daily_schedule[study_time] = {
+                            "activity": f"{course['code']} - Study Time",
+                            "type": "study",
+                            "date": current_day_date
+                        }
+            
+            # STEP 6: Add breaks (only in free slots)
+            break_times = ["10:30 AM", "3:30 PM"]
+            for break_time in break_times:
+                if break_time in daily_schedule and daily_schedule[break_time]["type"] == "free":
+                    daily_schedule[break_time] = {"activity": "Break/Walk", "type": "break", "date": current_day_date}
             
             weekly_schedule[day] = daily_schedule
         
@@ -868,13 +878,19 @@ def create_schedule_dataframe(weekly_schedule):
 def style_schedule_dataframe(df, weekly_schedule):
     """Apply color coding to the schedule dataframe"""
     def color_cell(val):
+        # Handle blank cells
+        if val == "":
+            return "background-color: transparent; color: transparent;"
+        
         # Get the type from the weekly schedule
         for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
             for time_slot in weekly_schedule.get(day, {}):
                 slot_data = weekly_schedule[day][time_slot]
                 if slot_data["activity"] == val:
                     activity_type = slot_data["type"]
-                    if activity_type == "class":
+                    if activity_type == "blank":
+                        return "background-color: transparent; color: transparent;"
+                    elif activity_type == "class":
                         return "background-color: #3742fa; color: white; font-weight: bold;"
                     elif activity_type == "study":
                         return "background-color: #5f27cd; color: white; font-weight: bold;"
