@@ -645,12 +645,11 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     # Generate 4 weeks of schedule starting from user's chosen date
     for week in range(4):
         weekly_schedule = {}
-        week_start_date = start_date + timedelta(weeks=week)
         
         for day_index, day in enumerate(days):
             daily_schedule = {}
             is_weekend = day in ["Saturday", "Sunday"]
-            current_day_date = week_start_date + timedelta(days=day_index)
+            current_day_date = start_date + timedelta(weeks=week, days=day_index)
             
             # Check if this day is before the start date
             is_before_start = current_day_date < start_date
@@ -814,21 +813,37 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     except:
                         continue
             
-            # STEP 5: Add study sessions (only in free slots)
+            # STEP 5: Add study sessions with variety (only in free slots)
             if not is_weekend:
                 study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM"]
             else:
-                study_times = ["10:00 AM", "2:00 PM"]
+                # More studying on weekends
+                study_times = ["10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM"]
             
-            for study_time in study_times:
-                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
-                    if courses:
-                        course = random.choice(courses)
-                        daily_schedule[study_time] = {
-                            "activity": f"{course['code']} - Study Time",
-                            "type": "study",
-                            "date": current_day_date
-                        }
+            # Create a balanced study schedule with variety
+            if courses:
+                # Create a weighted list of courses for variety
+                # Each course appears multiple times based on its "weight"
+                course_pool = []
+                for course in courses:
+                    # Add each course 2-3 times to the pool for variety
+                    course_pool.extend([course] * 3)
+                
+                # Shuffle to avoid patterns
+                import random
+                random.shuffle(course_pool)
+                
+                study_session_count = 0
+                for study_time in study_times:
+                    if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
+                        if study_session_count < len(course_pool):
+                            chosen_course = course_pool[study_session_count % len(course_pool)]
+                            daily_schedule[study_time] = {
+                                "activity": f"{chosen_course['code']} - Study Time",
+                                "type": "study",
+                                "date": current_day_date
+                            }
+                            study_session_count += 1
             
             # STEP 6: Add breaks (only in free slots)
             break_times = ["10:30 AM", "3:30 PM"]
@@ -1525,67 +1540,28 @@ def show_schedule_step():
     st.markdown("""
     <div class="setup-card">
         <h2><span class="step-number">3</span>Your Color-Coded Schedule</h2>
-        <p>30-minute increments with your actual class times and balanced wellness</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Stats
+    # Compact stats in one row
     courses_count = len(st.session_state.courses)
     assignments_count = len(st.session_state.get('assignments', []))
     intramurals_count = len(st.session_state.intramurals)
     
-    st.markdown(f"""
-    <div class="stats-grid">
-        <div class="stat-card">
-            <span class="stat-number">{courses_count}</span>
-            <div class="stat-label">Courses</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number">{assignments_count}</span>
-            <div class="stat-label">Assignments</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number">{intramurals_count}</span>
-            <div class="stat-label">Activities</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number">4</span>
-            <div class="stat-label">Weeks</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Courses", courses_count)
+    with col2:
+        st.metric("Assignments", assignments_count)
+    with col3:
+        st.metric("Activities", intramurals_count)
+    with col4:
+        st.metric("Weeks", 4)
     
-    # Color legend
+    # Compact legend in one line
     st.markdown("""
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #3742fa;"></div>
-            <span>📚 Classes</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #5f27cd;"></div>
-            <span>📖 Study</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #ff9f43;"></div>
-            <span>🍽️ Meals</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #e67e22;"></div>
-            <span>🏃 Activities</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #2f3542;"></div>
-            <span>😴 Sleep</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #ff6b6b;"></div>
-            <span>☕ Breaks</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #00d2d3;"></div>
-            <span>🎉 Free Time</span>
-        </div>
+    <div style="text-align: center; margin: 0.5rem 0; font-size: 0.8rem;">
+        🔵 Classes | 🟣 Study | 🟠 Meals | 🟤 Activities | ⚫ Sleep | 🔴 Breaks | 🟢 Free Time
     </div>
     """, unsafe_allow_html=True)
     
