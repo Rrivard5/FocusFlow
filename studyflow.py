@@ -438,48 +438,41 @@ def parse_days_string(schedule_str):
     return days
 
 def parse_excel_course_file(file):
-    """Parse the Excel file with the specified format using pandas"""
+    """Parse the Excel file with the specified format using pandas - memory optimized"""
     try:
-        # Read all sheets from the Excel file
-        excel_data = pd.read_excel(file, sheet_name=None, header=None)
+        # Read only the first few sheets to reduce memory usage
+        excel_data = pd.read_excel(file, sheet_name=None, header=None, nrows=50)
         courses = []
         
-        st.write(f"Found {len(excel_data)} sheets in the Excel file")
-        
-        # Process each sheet (each course)
+        # Process each sheet (each course) - limit to first 5 course sheets
+        course_count = 0
         for sheet_name, df in excel_data.items():
-            st.write(f"Processing sheet: {sheet_name}")
-            
-            # Only process sheets that start with "Course" and have data
-            if sheet_name.startswith('Course'):
+            # Only process sheets that start with "Course" and limit to 5 courses max
+            if sheet_name.startswith('Course') and course_count < 5:
                 course_data = {}
                 assignments = []
                 
                 # Safety check - ensure dataframe has enough rows and columns
                 if df.shape[0] < 3 or df.shape[1] < 2:
-                    st.warning(f"Sheet {sheet_name} is too small (only {df.shape[0]} rows, {df.shape[1]} columns). Skipping...")
                     continue
                 
-                # Check if the sheet actually has course data
+                # Check if the sheet actually has course data (check only first 5 rows)
                 has_course_data = False
-                for index in range(min(10, df.shape[0])):
+                for index in range(min(5, df.shape[0])):
                     try:
                         if index < df.shape[0] and df.shape[1] >= 2:
                             field_val = df.iloc[index, 0]
                             if pd.notna(field_val) and 'Course title' in str(field_val):
                                 has_course_data = True
                                 break
-                    except (IndexError, KeyError):
+                    except:
                         continue
                 
                 if not has_course_data:
-                    st.warning(f"Sheet {sheet_name} doesn't contain course data. Skipping...")
                     continue
                 
-                st.write(f"Processing course data from {sheet_name}...")
-                
-                # Read course information (safely iterate through available rows)
-                max_rows = min(25, df.shape[0])  # Increased range for course info
+                # Read course information (only first 20 rows)
+                max_rows = min(20, df.shape[0])
                 
                 for index in range(max_rows):
                     try:
@@ -493,10 +486,8 @@ def parse_excel_course_file(file):
                                 
                                 if 'Course title' in field:
                                     course_data['name'] = value
-                                    st.write(f"Found course: {value}")
                                 elif 'Course Lecture Schedule' in field:
                                     course_data['lecture_schedule'] = value
-                                    st.write(f"Found lecture schedule: {value}")
                                 elif 'Lecture location' in field:
                                     course_data['lecture_location'] = value
                                 elif 'When in lab' in field:
@@ -509,78 +500,62 @@ def parse_excel_course_file(file):
                                     course_data['recitation_location'] = value
                                 elif 'Suggested daily study time' in field:
                                     course_data['daily_study_time'] = value
-                    except (IndexError, KeyError, Exception) as e:
-                        st.write(f"Error reading row {index}: {e}")
+                    except:
                         continue
                 
                 # Only continue if we found a course name
                 if 'name' not in course_data:
-                    st.warning(f"No course name found in {sheet_name}. Skipping...")
                     continue
                 
                 # Generate course code from name
                 if 'name' in course_data:
-                    # Try to extract course code from name
-                    code_match = re.search(r'([A-Z]{2,4})\s*(\d{3,4})', course_data['name'].upper())
+                    # Simple code generation to save memory
+                    name_upper = course_data['name'].upper()
+                    code_match = re.search(r'([A-Z]{2,4})\s*(\d{3,4})', name_upper)
                     if code_match:
                         course_data['code'] = f"{code_match.group(1)}{code_match.group(2)}"
                     else:
-                        # Create code from name
-                        name_parts = course_data['name'].split()
-                        if len(name_parts) >= 2:
-                            course_data['code'] = f"{name_parts[0][:3]}{name_parts[1][:3]}".upper()
-                        else:
-                            course_data['code'] = course_data['name'].replace(' ', '')[:6].upper()
+                        # Simple fallback
+                        course_data['code'] = name_upper.replace(' ', '')[:6]
                 
-                # Parse class schedules
+                # Parse class schedules (simplified)
                 class_schedule = []
                 
                 # Lecture schedule
-                if 'lecture_schedule' in course_data and course_data['lecture_schedule'].lower() != 'n/a':
-                    days = parse_days_string(course_data['lecture_schedule'])
-                    times = parse_time_string(course_data['lecture_schedule'])
-                    if days and times:
-                        class_schedule.append({
-                            'days': days,
-                            'start_time': times[0],
-                            'end_time': times[1],
-                            'type': 'Lecture',
-                            'location': course_data.get('lecture_location', '')
-                        })
+                if course_data.get('lecture_schedule', '').lower() != 'n/a':
+                    schedule_str = course_data.get('lecture_schedule', '')
+                    if schedule_str:
+                        days = parse_days_string(schedule_str)
+                        times = parse_time_string(schedule_str)
+                        if days and times:
+                            class_schedule.append({
+                                'days': days,
+                                'start_time': times[0],
+                                'end_time': times[1],
+                                'type': 'Lecture',
+                                'location': course_data.get('lecture_location', '')
+                            })
                 
                 # Lab schedule
-                if 'lab_schedule' in course_data and course_data['lab_schedule'].lower() != 'n/a':
-                    days = parse_days_string(course_data['lab_schedule'])
-                    times = parse_time_string(course_data['lab_schedule'])
-                    if days and times:
-                        class_schedule.append({
-                            'days': days,
-                            'start_time': times[0],
-                            'end_time': times[1],
-                            'type': 'Lab',
-                            'location': course_data.get('lab_location', '')
-                        })
-                
-                # Recitation schedule
-                if 'recitation_schedule' in course_data and course_data['recitation_schedule'].lower() != 'n/a':
-                    days = parse_days_string(course_data['recitation_schedule'])
-                    times = parse_time_string(course_data['recitation_schedule'])
-                    if days and times:
-                        class_schedule.append({
-                            'days': days,
-                            'start_time': times[0],
-                            'end_time': times[1],
-                            'type': 'Recitation',
-                            'location': course_data.get('recitation_location', '')
-                        })
+                if course_data.get('lab_schedule', '').lower() != 'n/a':
+                    schedule_str = course_data.get('lab_schedule', '')
+                    if schedule_str:
+                        days = parse_days_string(schedule_str)
+                        times = parse_time_string(schedule_str)
+                        if days and times:
+                            class_schedule.append({
+                                'days': days,
+                                'start_time': times[0],
+                                'end_time': times[1],
+                                'type': 'Lab',
+                                'location': course_data.get('lab_location', '')
+                            })
                 
                 course_data['class_schedule'] = class_schedule
                 
-                # Read assignments (safely look for assignment rows)
+                # Read assignments (limited to save memory)
                 assignment_start_row = 14
-                assignment_end_row = min(35, df.shape[0])  # Increased range for assignments
-                
-                st.write(f"Looking for assignments in rows {assignment_start_row} to {assignment_end_row}")
+                assignment_end_row = min(25, df.shape[0])  # Reduced range
                 
                 for index in range(assignment_start_row, assignment_end_row):
                     try:
@@ -603,8 +578,10 @@ def parse_excel_course_file(file):
                                         'course': course_data.get('code', 'UNKNOWN'),
                                         'priority': 'high' if 'Exam' in assignment_type else 'medium'
                                     })
-                                    st.write(f"Found assignment: {assignment_type} - {due_date}")
-                    except (IndexError, KeyError, Exception) as e:
+                                    # Limit assignments per course to save memory
+                                    if len(assignments) >= 10:
+                                        break
+                    except:
                         continue
                 
                 course_data['assignments'] = assignments
@@ -612,18 +589,18 @@ def parse_excel_course_file(file):
                 # Only add course if we got some basic info
                 if 'name' in course_data:
                     courses.append(course_data)
-                    st.write(f"✅ Successfully processed course: {course_data['name']}")
-                else:
-                    st.warning(f"Could not find sufficient course data in {sheet_name}")
-            else:
-                st.info(f"Skipping sheet '{sheet_name}' (doesn't start with 'Course')")
+                    course_count += 1
+                
+                # Clear the dataframe to free memory
+                del df
         
-        st.write(f"Total courses processed: {len(courses)}")
+        # Clear excel_data to free memory
+        del excel_data
+        
         return courses
     
     except Exception as e:
         st.error(f"Error reading Excel file: {str(e)}")
-        st.write("Please check your Excel file format and try again.")
         return []
 
 def generate_time_slots():
