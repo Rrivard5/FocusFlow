@@ -715,9 +715,9 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                             print(f"Error parsing time for {course['code']} {class_type}: {e}")
                             continue
         
-        # STEP 2: Add sleep schedule and end-of-day "Go to Sleep" (only in free slots)
+        # STEP 2: Add sleep schedule (only in free slots)
         wake_time = preferences.get('wake_time', 8)
-        bedtime = preferences.get('bedtime', 11)
+        bedtime = preferences.get('bedtime', 10)
         
         # Fill sleep times
         for time_slot in time_slots:
@@ -752,18 +752,7 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         if go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
         
-        # STEP 3: Add meals (only in free slots)
-        meal_times = {
-            "8:00 AM": "Breakfast",
-            "12:00 PM": "Lunch", 
-            "6:00 PM": "Dinner"
-        }
-        
-        for meal_time, meal_name in meal_times.items():
-            if meal_time in daily_schedule and daily_schedule[meal_time]["type"] == "free":
-                daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
-        
-        # STEP 4: Add intramural activities (only in free slots)
+        # STEP 3: Add intramural activities NEXT - HIGH PRIORITY (only in free slots)
         for intramural in intramurals:
             if intramural.get('scheduled') and day in intramural.get('days', []):
                 start_time = intramural.get('start_time', '5:00 PM')
@@ -776,8 +765,8 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     for i in range(start_slot, min(start_slot + slots_needed, len(time_slots))):
                         if i < len(time_slots):
                             slot_time = time_slots[i]
-                            # Only add if free
-                            if daily_schedule[slot_time]["type"] == "free":
+                            # Only add if free (but override meals and study - they can move)
+                            if daily_schedule[slot_time]["type"] in ["free", "meal", "study", "break"]:
                                 daily_schedule[slot_time] = {
                                     "activity": f"{intramural['name']} - {intramural['type']}",
                                     "type": "activity",
@@ -785,6 +774,46 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                                 }
                 except:
                     continue
+        
+        # STEP 4: Add meals (only in remaining free slots, flexible timing)
+        base_meal_times = {
+            "8:00 AM": "Breakfast",
+            "12:00 PM": "Lunch", 
+            "6:00 PM": "Dinner"
+        }
+        
+        for base_time, meal_name in base_meal_times.items():
+            # Try the ideal time first
+            if base_time in daily_schedule and daily_schedule[base_time]["type"] == "free":
+                daily_schedule[base_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+            else:
+                # Find nearby free slot if ideal time is taken
+                base_hour = int(base_time.split(':')[0])
+                base_period = 'AM' if 'AM' in base_time else 'PM'
+                
+                # Try nearby times (30 min before/after)
+                for offset in [0, -30, 30, -60, 60]:
+                    try_minutes = (base_hour * 60) + offset
+                    if base_period == 'PM' and base_hour != 12:
+                        try_minutes += 12 * 60
+                    elif base_period == 'AM' and base_hour == 12:
+                        try_minutes -= 12 * 60
+                    
+                    try_hour = (try_minutes // 60) % 24
+                    try_min = try_minutes % 60
+                    
+                    if try_hour == 0:
+                        try_time_str = f"12:{try_min:02d} AM"
+                    elif try_hour < 12:
+                        try_time_str = f"{try_hour}:{try_min:02d} AM"
+                    elif try_hour == 12:
+                        try_time_str = f"12:{try_min:02d} PM"
+                    else:
+                        try_time_str = f"{try_hour-12}:{try_min:02d} PM"
+                    
+                    if try_time_str in daily_schedule and daily_schedule[try_time_str]["type"] == "free":
+                        daily_schedule[try_time_str] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+                        break
         
         # STEP 5: Add study sessions with variety (only in free slots)
         if not is_weekend:
@@ -945,7 +974,6 @@ def generate_pdf_schedule(schedule_data, user_data):
     
     # Important reminders section
     story.append(Paragraph("📋 Important Reminders", ParagraphStyle('RemindersHeader', parent=styles['Heading3'], fontSize=12, spaceAfter=6)))
-    story.append(Paragraph("• <b>Reusable template:</b> This weekly schedule can be repeated throughout your semester - adjust as needed for different weeks.", wellness_style))
     story.append(Paragraph("• <b>Sleep is crucial:</b> This schedule prioritizes 7-9 hours of sleep for optimal learning and memory consolidation.", wellness_style))
     story.append(Paragraph("• <b>Sample schedule:</b> This is one possible arrangement. Modify times and activities based on your needs and preferences.", wellness_style))
     story.append(Paragraph("• <b>Flexibility matters:</b> Use 'buffer time' between classes for walking, transitions, or short breaks.", wellness_style))
@@ -1060,8 +1088,66 @@ def main():
     
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     
-    # Step-by-step flow
-    if st.session_state.step == 1:
+    # Check if user wants to load a saved configuration first
+    if not st.session_state.get('config_checked', False):
+        st.markdown("""
+        <div style="background: rgba(108, 92, 231, 0.1); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
+            <h3 style="color: #6c5ce7; margin-bottom: 0.5rem;">🚀 Welcome to FocusFlow!</h3>
+            <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Create a balanced weekly schedule template</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            st.markdown("**Do you have a saved FocusFlow configuration?**")
+            
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                if st.button("📁 Load Saved Config", type="primary"):
+                    st.session_state.show_config_upload = True
+                    st.rerun()
+            
+            with col_b:
+                if st.button("🆕 Start Fresh"):
+                    st.session_state.config_checked = True
+                    st.session_state.step = 1
+                    st.rerun()
+        
+        # Show config upload if requested
+        if st.session_state.get('show_config_upload', False):
+            st.markdown("---")
+            config_file = st.file_uploader(
+                "Upload your saved FocusFlow configuration",
+                type=['json'],
+                help="Load a previously saved FocusFlow configuration"
+            )
+            
+            if config_file is not None:
+                try:
+                    config_data = json.load(config_file)
+                    
+                    # Validate the config file
+                    if 'courses' in config_data and 'user_data' in config_data:
+                        st.session_state.courses = config_data['courses']
+                        st.session_state.intramurals = config_data.get('intramurals', [])
+                        st.session_state.user_data = config_data['user_data']
+                        st.session_state.config_checked = True
+                        st.session_state.step = 2  # Skip to preferences since we have courses
+                        
+                        st.success(f"✅ Loaded saved configuration with {len(config_data['courses'])} courses!")
+                        st.info(f"📅 Originally created: {config_data.get('created_date', 'Unknown date')}")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid configuration file format.")
+                except json.JSONDecodeError:
+                    st.error("❌ Could not read configuration file.")
+                except Exception as e:
+                    st.error(f"❌ Error loading configuration: {str(e)}")
+    
+    # Regular step flow
+    elif st.session_state.step == 1:
         show_excel_upload()
     elif st.session_state.step == 2:
         show_preferences_step()
@@ -1386,7 +1472,7 @@ def show_preferences_step():
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
         
         # Bedtime with AM/PM
-        bedtime_hour = st.slider("Bedtime hour", 9, 2, 11)
+        bedtime_hour = st.slider("Bedtime hour", 9, 2, 10)
         if bedtime_hour >= 9:
             bedtime_display = f"{bedtime_hour}:00 PM"
         else:
