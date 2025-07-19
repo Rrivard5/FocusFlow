@@ -1,4 +1,71 @@
-import streamlit as st
+# File upload section (only show if not editing and no courses loaded)
+    if st.session_state.get('editing_course') is None and not st.session_state.courses:
+        st.markdown("### 📄 Upload Course Template")
+        
+        # Instructions
+        st.info("""
+        **Template Format Requirements:**
+        - Excel file with separate tabs for each course (Course 1, Course 2, etc.)
+        - Each tab should contain course information, class schedules, and assignment details
+        - Use the format: Course title, lecture schedule, lab schedule, assignments, etc.
+        """)
+        
+        uploaded_file = st.file_uploader(
+            "Choose Excel file",
+            type=['xlsx', 'xls'],
+            help="Upload your course template Excel file"
+        )
+        
+        if uploaded_file is not None:
+            with st.spinner("🧠 Processing your course template..."):
+                courses = parse_excel_course_file(uploaded_file)
+                
+                if courses:
+                    st.session_state.courses = courses
+                    
+                    # Create assignments list
+                    all_assignments = []
+                    for course in courses:
+                        all_assignments.extend(course.get('assignments', []))
+                    st.session_state.assignments = all_assignments
+                    
+                    st.success(f"✅ Successfully loaded {len(courses)} courses with {len(all_assignments)} assignments!")
+                    
+                    # Show what was found and option to continue
+                    if len(courses) > 0:
+                        st.info(f"📋 Found {len(courses)} courses. If this looks correct, click Continue below. You can edit or add more courses if needed.")
+                    
+                    # Clear the file uploader to prevent re-processing
+                    st.session_state.file_processed = True
+                    st.rerun()
+                else:
+                    st.error("❌ Could not read course data from the file. Please check the format.")
+        
+        # Option to add course manually (always visible when no courses)
+        with st.expander("➕ Add Course Manually"):
+            st.markdown("**Add a course if you don't have an Excel file:**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                manual_code = st.text_input("Course Code", key="manual_code", placeholder="e.g., BIO1205")
+                manual_name = st.text_input("Course Name", key="manual_name", placeholder="e.g., Biology Lab")
+            
+            with col2:
+                manual_study_time = st.text_input("Daily Study Time", key="manual_study", placeholder="e.g., 30 min")
+            
+            # Class schedule
+            st.markdown("**Class Schedule:**")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                manual_days = st.multiselect(
+                    "Days",
+                    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    key="manual_days"
+                )
+            
+            with col2:
+                manual_startimport streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
 import re
@@ -1057,8 +1124,8 @@ def show_excel_upload():
                 st.session_state.editing_course = None
                 st.rerun()
     
-    # File upload section (only show if not editing)
-    if st.session_state.get('editing_course') is None:
+    # File upload section (only show if not editing and haven't processed a file yet)
+    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
         st.markdown("### 📄 Upload Course Template")
         
         # Instructions
@@ -1089,13 +1156,18 @@ def show_excel_upload():
                     st.session_state.assignments = all_assignments
                     
                     st.success(f"✅ Successfully loaded {len(courses)} courses with {len(all_assignments)} assignments!")
+                    
+                    # Mark file as processed to prevent reprocessing
+                    st.session_state.file_processed = True
                     st.rerun()
                 else:
                     st.error("❌ Could not read course data from the file. Please check the format.")
-        
+    
+    # Show manual course addition option when no file has been processed
+    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
         # Option to add course manually
         with st.expander("➕ Add Course Manually"):
-            st.markdown("**Add a new course if the Excel upload didn't capture everything:**")
+            st.markdown("**Add a course if you don't have an Excel file:**")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -1144,6 +1216,103 @@ def show_excel_upload():
                         }]
                     
                     st.session_state.courses.append(manual_course)
+                    st.session_state.file_processed = True  # Mark as having course data
+                    st.success(f"✅ Added {manual_code} manually!")
+                    st.rerun()
+                else:
+                    st.error("Please fill in at least the course code and name.")
+    
+    # Show action buttons when courses are loaded
+    if st.session_state.courses and st.session_state.get('editing_course') is None:
+        st.markdown("### 🎯 Ready to Continue?")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📝 Add Another Course"):
+                # Allow them to add more courses manually
+                with st.form("add_course_form"):
+                    st.markdown("**Add Another Course:**")
+                    
+                    form_col1, form_col2 = st.columns(2)
+                    with form_col1:
+                        new_code = st.text_input("Course Code", placeholder="e.g., CHEM101")
+                        new_name = st.text_input("Course Name", placeholder="e.g., General Chemistry")
+                    
+                    with form_col2:
+                        new_study_time = st.text_input("Daily Study Time", placeholder="e.g., 45 min")
+                    
+                    # Class schedule
+                    st.markdown("**Class Schedule:**")
+                    form_col1, form_col2, form_col3, form_col4 = st.columns(4)
+                    
+                    with form_col1:
+                        new_days = st.multiselect(
+                            "Days",
+                            ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                        )
+                    
+                    with form_col2:
+                        new_start = st.text_input("Start Time", placeholder="e.g., 11:00 AM")
+                    
+                    with form_col3:
+                        new_end = st.text_input("End Time", placeholder="e.g., 12:30 PM")
+                    
+                    with form_col4:
+                        new_location = st.text_input("Location", placeholder="e.g., Chem Lab")
+                    
+                    if st.form_submit_button("Add Course"):
+                        if new_code and new_name:
+                            new_course = {
+                                'code': new_code,
+                                'name': new_name,
+                                'daily_study_time': new_study_time or '30 min',
+                                'class_schedule': []
+                            }
+                            
+                            if new_days and new_start and new_end:
+                                new_course['class_schedule'] = [{
+                                    'days': new_days,
+                                    'start_time': new_start,
+                                    'end_time': new_end,
+                                    'type': 'Lecture',
+                                    'location': new_location
+                                }]
+                            
+                            st.session_state.courses.append(new_course)
+                            st.success(f"✅ Added {new_code}!")
+                            st.rerun()
+        
+        with col2:
+            if st.button("🚀 Continue to Preferences", type="primary", key="continue_main"):
+                st.session_state.step = 2
+                st.rerun() = st.text_input("Start Time", key="manual_start", placeholder="e.g., 9:00 AM")
+            
+            with col3:
+                manual_end = st.text_input("End Time", key="manual_end", placeholder="e.g., 10:30 AM")
+            
+            with col4:
+                manual_location = st.text_input("Location", key="manual_location", placeholder="e.g., Room 101")
+            
+            if st.button("Add Manual Course"):
+                if manual_code and manual_name:
+                    manual_course = {
+                        'code': manual_code,
+                        'name': manual_name,
+                        'daily_study_time': manual_study_time or '30 min',
+                        'class_schedule': []
+                    }
+                    
+                    if manual_days and manual_start and manual_end:
+                        manual_course['class_schedule'] = [{
+                            'days': manual_days,
+                            'start_time': manual_start,
+                            'end_time': manual_end,
+                            'type': 'Lecture',
+                            'location': manual_location
+                        }]
+                    
+                    st.session_state.courses.append(manual_course)
                     st.success(f"✅ Added {manual_code} manually!")
                     st.rerun()
                 else:
@@ -1157,23 +1326,23 @@ def show_excel_upload():
     <p class="progress-text">Step 1 of 3 - Upload your course template to continue</p>
     """, unsafe_allow_html=True)
     
-    # Navigation buttons
+    # Navigation buttons at bottom
     col1, col2 = st.columns(2)
     
     with col1:
         if st.session_state.courses:
             if st.button("🔄 Upload Different File"):
+                # Reset everything to start over
                 st.session_state.courses = []
                 st.session_state.assignments = []
+                st.session_state.file_processed = False
+                st.session_state.editing_course = None
                 st.rerun()
     
     with col2:
-        if st.session_state.courses:
-            if st.button("🚀 Continue to Preferences", type="primary"):
-                st.session_state.step = 2
-                st.rerun()
-        else:
-            st.info("👆 Upload your course template Excel file to continue")
+        # This button is now handled above in the action section
+        if not st.session_state.courses:
+            st.info("👆 Upload your course template or add courses manually to continue")
 
 
 def show_preferences_step():
