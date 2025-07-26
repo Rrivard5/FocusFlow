@@ -434,7 +434,7 @@ def parse_time_string(time_str):
     return None
 
 def parse_days_string(schedule_str):
-    """Parse days from string like 'M,W,F 10:40-11:30am' or 'T,R 2:00-3:30pm'"""
+    """Parse days from string like 'M,W,F 10:40-11:30am', 'TR 2:00-3:30pm', or 'T,R 2:00-3:30pm'"""
     if not schedule_str or str(schedule_str).lower() == 'n/a':
         return []
     
@@ -452,12 +452,18 @@ def parse_days_string(schedule_str):
     # Get just the days part (before the time)
     days_part = schedule_str.split()[0] if ' ' in schedule_str else schedule_str
     
-    # Split by comma and process each day
-    day_letters = days_part.replace(',', '').replace(' ', '')
+    # Handle both "TR" and "T,R" formats
+    if ',' in days_part:
+        # Format like "T,R" or "M,W,F"
+        day_letters = days_part.replace(',', '').replace(' ', '')
+    else:
+        # Format like "TR" or "MWF"
+        day_letters = days_part.replace(' ', '')
     
-    for letter in day_letters:
-        if letter.upper() in days_map:
-            full_day = days_map[letter.upper()]
+    # Process each character as a day abbreviation
+    for letter in day_letters.upper():
+        if letter in days_map:
+            full_day = days_map[letter]
             if full_day not in days:  # Avoid duplicates
                 days.append(full_day)
     
