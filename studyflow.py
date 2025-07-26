@@ -404,7 +404,7 @@ if 'final_schedule' not in st.session_state:
     st.session_state.final_schedule = None
 
 def parse_time_string(time_str):
-    """Parse time string like '10:40-11:30am' or 'M,W,F 10:40-11:30am'"""
+    """Parse time string like '10:40-11:30am', '10am-12pm', or 'M,W,F 10:40-11:30am'"""
     if not time_str or str(time_str).lower() == 'n/a':
         return None
     
@@ -413,21 +413,44 @@ def parse_time_string(time_str):
     if any(day in time_str.upper() for day in ['M', 'T', 'W', 'R', 'F', 'S']):
         parts = time_str.split(' ')
         if len(parts) > 1:
-            time_part = parts[1]
+            time_part = ' '.join(parts[1:])  # Take everything after the days
     
-    # Extract time range
-    time_match = re.search(r'(\d{1,2}:\d{2})-(\d{1,2}:\d{2})', time_part)
+    # Extract time range - handle multiple formats
+    # Format 1: "10:40-11:30am" or "10:40-11:30pm"
+    time_match = re.search(r'(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\s*(am|pm)', time_part.lower())
     if time_match:
         start_time = time_match.group(1)
         end_time = time_match.group(2)
+        period = time_match.group(3).upper()
         
-        # Add AM/PM if not present
-        if 'am' in time_part.lower() or 'pm' in time_part.lower():
-            period = 'AM' if 'am' in time_part.lower() else 'PM'
-            if ':' in start_time and 'M' not in start_time:
-                start_time += f' {period}'
-            if ':' in end_time and 'M' not in end_time:
-                end_time += f' {period}'
+        # Add period to both times
+        start_time += f' {period}'
+        end_time += f' {period}'
+        
+        return start_time, end_time
+    
+    # Format 2: "10am-12pm" or "10am-2pm"
+    time_match2 = re.search(r'(\d{1,2})\s*(am|pm)\s*-\s*(\d{1,2})\s*(am|pm)', time_part.lower())
+    if time_match2:
+        start_hour = time_match2.group(1)
+        start_period = time_match2.group(2).upper()
+        end_hour = time_match2.group(3)
+        end_period = time_match2.group(4).upper()
+        
+        start_time = f"{start_hour}:00 {start_period}"
+        end_time = f"{end_hour}:00 {end_period}"
+        
+        return start_time, end_time
+    
+    # Format 3: "10:40-11:30" (no am/pm specified)
+    time_match3 = re.search(r'(\d{1,2}:\d{2})-(\d{1,2}:\d{2})', time_part)
+    if time_match3:
+        start_time = time_match3.group(1)
+        end_time = time_match3.group(2)
+        
+        # Default to AM if no period specified
+        start_time += ' AM'
+        end_time += ' AM'
         
         return start_time, end_time
     
