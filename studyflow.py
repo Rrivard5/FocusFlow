@@ -325,15 +325,49 @@ st.markdown("""
     
     .stSelectbox > div > div > div {
         color: #2d3748 !important;
+        font-weight: 600 !important;
     }
     
+    /* Fix dropdown options and selected text */
     .stSelectbox div[data-baseweb="select"] > div {
         color: #2d3748 !important;
         background: rgba(255, 255, 255, 0.95) !important;
+        font-weight: 600 !important;
     }
     
     .stSelectbox [data-baseweb="select"] {
         background-color: rgba(255, 255, 255, 0.95) !important;
+        color: #2d3748 !important;
+    }
+    
+    /* Dropdown menu options */
+    .stSelectbox [role="option"] {
+        color: #2d3748 !important;
+        background-color: #ffffff !important;
+        font-weight: 500 !important;
+    }
+    
+    .stSelectbox [role="option"]:hover {
+        background-color: #f7fafc !important;
+        color: #2d3748 !important;
+    }
+    
+    /* Selected option in dropdown */
+    .stSelectbox [aria-selected="true"] {
+        background-color: #e2e8f0 !important;
+        color: #2d3748 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Main selectbox text (what you see when closed) */
+    .stSelectbox span {
+        color: #2d3748 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Ensure all selectbox text is visible */
+    .stSelectbox * {
+        color: #2d3748 !important;
     }
     
     .stTextInput > div > div > input {
@@ -1058,7 +1092,7 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         wake_time = preferences.get('wake_time', 8)
         bedtime = preferences.get('bedtime', 23)  # Using 24-hour format now
         
-        # Fill sleep times
+        # Fill sleep times - continuous sleep from bedtime to wake time
         for time_slot in time_slots:
             if daily_schedule[time_slot]["type"] == "free":  # Only if free
                 hour = int(time_slot.split(':')[0])
@@ -1070,25 +1104,34 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                 elif is_am and hour == 12:
                     hour = 0
                 
-                # Sleep from bedtime to wake time
-                if (bedtime >= 22 and hour >= bedtime) or (hour < wake_time):
+                # Determine if this hour should be sleep
+                should_be_sleep = False
+                
+                if bedtime >= 22:  # Bedtime is 10 PM or later (22, 23)
+                    # Sleep from bedtime until wake_time next day
+                    if hour >= bedtime or hour < wake_time:
+                        should_be_sleep = True
+                elif bedtime <= 2:  # Bedtime is early morning (1 AM, 2 AM)
+                    bedtime_24 = bedtime + 24  # Convert to 24+ for comparison
+                    if hour >= 22 or hour <= bedtime or hour < wake_time:
+                        should_be_sleep = True
+                
+                if should_be_sleep:
                     daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
         
-        # Add "Go to Sleep" slot 30 minutes before bedtime
+        # Add "Go to Sleep" slot 30 minutes before bedtime (only if it's currently free)
+        go_to_sleep_time = None
         if bedtime >= 22:  # If bedtime is 10 PM (22) or later
-            go_to_sleep_hour = bedtime
-            go_to_sleep_time = f"{go_to_sleep_hour - 12}:30 PM" if bedtime > 12 else f"{bedtime}:30 PM"
-        elif bedtime <= 2:  # If bedtime is early morning (like 1 AM = bedtime_hour of 1)  
-            go_to_sleep_hour = bedtime
-            go_to_sleep_time = f"{go_to_sleep_hour}:30 AM"
-        else:
-            go_to_sleep_hour = bedtime
-            go_to_sleep_time = f"{bedtime}:30 PM"
+            if bedtime == 22:  # 10 PM
+                go_to_sleep_time = "9:30 PM"
+            elif bedtime == 23:  # 11 PM
+                go_to_sleep_time = "10:30 PM"
+        elif bedtime == 1:  # 1 AM (stored as 25)
+            go_to_sleep_time = "12:30 AM"
+        elif bedtime == 2:  # 2 AM (stored as 26)
+            go_to_sleep_time = "1:30 AM"
         
-        # Debug the go to sleep time calculation
-        print(f"Bedtime: {bedtime}, Go to sleep time: {go_to_sleep_time}")
-        
-        if go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
+        if go_to_sleep_time and go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
         
         # STEP 4: Add meals (only in free slots, but try to be flexible)
@@ -1113,58 +1156,84 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     daily_schedule[alt_time] = {"activity": "Dinner", "type": "meal", "date": current_day_date}
                     break
         
-        # STEP 5: Add study sessions with variety (only in free slots)
-        if not is_weekend:
-            study_times = ["10:00 AM", "2:00 PM", "4:00 PM", "7:00 PM", "8:00 PM"]
-        else:
-            # More studying on weekends
-            study_times = ["10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM", "8:00 PM"]
+        # STEP 5: Add study sessions based on course requirements (only in free slots)
+        course_study_requirements = {}
+        total_daily_study_needed = 0
         
-        # Create a balanced study schedule with variety
-        if courses:
-            # Create a weighted list of courses for variety
-            # Each course appears multiple times based on its "weight"
-            course_pool = []
-            for course in courses:
-                # Add each course 2-3 times to the pool for variety
-                course_pool.extend([course] * 3)
+        # Parse study time requirements for each course
+        for course in courses:
+            study_time_str = course.get('daily_study_time', '30 min')
+            # Extract minutes from strings like "2 hours", "90 minutes", "1.5 hours", "2"
+            if 'hour' in study_time_str.lower():
+                hours_match = re.search(r'(\d+\.?\d*)', study_time_str)
+                if hours_match:
+                    hours = float(hours_match.group(1))
+                    minutes = int(hours * 60)
+                else:
+                    minutes = 30  # default
+            elif 'min' in study_time_str.lower():
+                min_match = re.search(r'(\d+)', study_time_str)
+                minutes = int(min_match.group(1)) if min_match else 30
+            else:
+                # Just a number - assume it's hours if >= 2, minutes if < 2
+                num_match = re.search(r'(\d+\.?\d*)', study_time_str)
+                if num_match:
+                    num = float(num_match.group(1))
+                    if num >= 2:
+                        minutes = int(num * 60)  # assume hours
+                    else:
+                        minutes = int(num * 60) if num < 2 else int(num)  # assume hours or minutes
+                else:
+                    minutes = 30  # default
             
-            # Shuffle to avoid patterns
-            import random
-            random.shuffle(course_pool)
+            # Convert to 30-minute sessions needed
+            sessions_needed = max(1, round(minutes / 30))
+            course_study_requirements[course['code']] = sessions_needed
+            total_daily_study_needed += sessions_needed
             
-            study_session_count = 0
-            for study_time in study_times:
-                if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
-                    if study_session_count < len(course_pool):
-                        chosen_course = course_pool[study_session_count % len(course_pool)]
-                        daily_schedule[study_time] = {
-                            "activity": f"{chosen_course['code']} - Study Time",
-                            "type": "study",
-                            "date": current_day_date
-                        }
-                        study_session_count += 1
+            print(f"Course {course['code']}: {study_time_str} = {minutes} min = {sessions_needed} sessions")
+        
+        # Generate study time slots based on day type
+        if not is_weekend:
+            base_study_times = ["9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"]
+        else:
+            base_study_times = ["9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"]
+        
+        # Add more slots if needed for high study requirements
+        extra_times = ["1:00 PM", "8:30 PM", "9:30 PM", "6:30 PM", "10:30 AM", "11:30 AM"]
+        if total_daily_study_needed > len(base_study_times):
+            base_study_times.extend(extra_times[:total_daily_study_needed - len(base_study_times)])
+        
+        # Schedule study sessions according to requirements
+        study_slots_assigned = {}
+        for course_code in course_study_requirements:
+            study_slots_assigned[course_code] = 0
+        
+        # First pass: assign required sessions for each course
+        available_times = []
+        for study_time in base_study_times:
+            if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
+                available_times.append(study_time)
+        
+        # Distribute study sessions fairly
+        time_index = 0
+        while time_index < len(available_times) and any(study_slots_assigned[code] < course_study_requirements[code] for code in course_study_requirements):
+            study_time = available_times[time_index]
             
-            # If some study sessions were blocked by activities, try alternative times
-            scheduled_study_count = sum(1 for slot in daily_schedule.values() if slot["type"] == "study")
-            target_study_sessions = 4 if not is_weekend else 6
+            # Find a course that still needs study sessions
+            for course_code, sessions_needed in course_study_requirements.items():
+                if study_slots_assigned[course_code] < sessions_needed and daily_schedule[study_time]["type"] == "free":
+                    daily_schedule[study_time] = {
+                        "activity": f"{course_code} - Study Time",
+                        "type": "study",
+                        "date": current_day_date,
+                        "course_code": course_code  # Add course code for color mapping
+                    }
+                    study_slots_assigned[course_code] += 1
+                    print(f"Assigned {course_code} study session to {study_time}")
+                    break
             
-            if scheduled_study_count < target_study_sessions:
-                # Try alternative study times
-                alt_study_times = ["9:00 AM", "1:00 PM", "3:00 PM", "8:30 PM", "9:00 PM"]
-                for alt_time in alt_study_times:
-                    if (alt_time in daily_schedule and 
-                        daily_schedule[alt_time]["type"] == "free" and 
-                        scheduled_study_count < target_study_sessions):
-                        if study_session_count < len(course_pool):
-                            chosen_course = course_pool[study_session_count % len(course_pool)]
-                            daily_schedule[alt_time] = {
-                                "activity": f"{chosen_course['code']} - Study Time",
-                                "type": "study",
-                                "date": current_day_date
-                            }
-                            study_session_count += 1
-                            scheduled_study_count += 1
+            time_index += 1
         
         # STEP 6: Add breaks (only in free slots)
         break_times = ["10:30 AM", "3:30 PM"]
@@ -1210,7 +1279,35 @@ def create_schedule_dataframe(weekly_schedule):
     return df
 
 def style_schedule_dataframe(df, weekly_schedule):
-    """Apply color coding to the schedule dataframe with different study colors"""
+    """Apply color coding to the schedule dataframe with course-specific colors"""
+    
+    # Define base colors for courses (classes)
+    course_colors = {
+        'class': ['#3742fa', '#2f3542', '#ff6348', '#2ed573', '#ffa502', '#a4b0be', '#ff4757', '#5352ed'],
+        'study': ['#74b9ff', '#57606f', '#ff9f43', '#55efc4', '#ffc048', '#d1d8e0', '#ff7675', '#6c5ce7']
+    }
+    
+    # Create course code to color mapping
+    courses_found = set()
+    for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
+        for time_slot in weekly_schedule.get(day, {}):
+            slot_data = weekly_schedule[day][time_slot]
+            if slot_data["type"] in ["class", "study"]:
+                activity = slot_data["activity"]
+                # Extract course code (first part before " - ")
+                if " - " in activity:
+                    course_code = activity.split(" - ")[0]
+                    courses_found.add(course_code)
+    
+    courses_list = sorted(list(courses_found))
+    course_color_map = {}
+    for i, course_code in enumerate(courses_list):
+        color_index = i % len(course_colors['class'])
+        course_color_map[course_code] = {
+            'class': course_colors['class'][color_index],
+            'study': course_colors['study'][color_index]
+        }
+    
     def color_cell(val):
         # Handle blank cells
         if val == "":
@@ -1222,26 +1319,25 @@ def style_schedule_dataframe(df, weekly_schedule):
                 slot_data = weekly_schedule[day][time_slot]
                 if slot_data["activity"] == val:
                     activity_type = slot_data["type"]
+                    
                     if activity_type == "blank":
                         return "background-color: transparent; color: transparent;"
                     elif activity_type == "class":
-                        return "background-color: #3742fa; color: white; font-weight: bold;"
-                    elif activity_type == "study":
-                        # Different colors for different courses in study time
-                        if 'MICROA' in val or 'MICRO' in val:
-                            return "background-color: #8e44ad; color: white; font-weight: bold;"  # Purple
-                        elif 'A&PI' in val or 'A&P' in val:
-                            return "background-color: #9b59b6; color: white; font-weight: bold;"  # Light Purple
-                        elif 'CHEM' in val:
-                            return "background-color: #e74c3c; color: white; font-weight: bold;"  # Red
-                        elif 'BIO' in val:
-                            return "background-color: #27ae60; color: white; font-weight: bold;"  # Green
-                        elif 'MATH' in val:
-                            return "background-color: #f39c12; color: white; font-weight: bold;"  # Orange
-                        elif 'PHYS' in val:
-                            return "background-color: #2980b9; color: white; font-weight: bold;"  # Blue
+                        # Get course code for color mapping
+                        course_code = val.split(" - ")[0] if " - " in val else "DEFAULT"
+                        if course_code in course_color_map:
+                            color = course_color_map[course_code]['class']
                         else:
-                            return "background-color: #5f27cd; color: white; font-weight: bold;"  # Default study purple
+                            color = "#3742fa"  # default class color
+                        return f"background-color: {color}; color: white; font-weight: bold;"
+                    elif activity_type == "study":
+                        # Get course code for color mapping
+                        course_code = val.split(" - ")[0] if " - " in val else "DEFAULT"
+                        if course_code in course_color_map:
+                            color = course_color_map[course_code]['study']
+                        else:
+                            color = "#5f27cd"  # default study color
+                        return f"background-color: {color}; color: white; font-weight: bold;"
                     elif activity_type == "meal":
                         return "background-color: #ff9f43; color: white; font-weight: bold;"
                     elif activity_type == "activity":
