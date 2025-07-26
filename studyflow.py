@@ -782,7 +782,7 @@ def parse_excel_course_file(file):
                             cleaned_name = re.sub(r'[^A-Z0-9]', '', name_upper)
                             course_data['code'] = cleaned_name[:4] if len(cleaned_name) >= 4 else cleaned_name
                 
-                # Parse class schedules (simplified)
+                # Parse class schedules - handle all types (lecture, lab, recitation)
                 class_schedule = []
                 
                 # Lecture schedule
@@ -801,7 +801,7 @@ def parse_excel_course_file(file):
                             })
                 
                 # Lab schedule
-                if course_data.get('lab_schedule', '').lower() != 'n/a':
+                if course_data.get('lab_schedule', '').lower() != 'n/a' and course_data.get('lab_schedule', ''):
                     schedule_str = course_data.get('lab_schedule', '')
                     if schedule_str:
                         days = parse_days_string(schedule_str)
@@ -813,6 +813,21 @@ def parse_excel_course_file(file):
                                 'end_time': times[1],
                                 'type': 'Lab',
                                 'location': course_data.get('lab_location', '')
+                            })
+                
+                # Recitation schedule
+                if course_data.get('recitation_schedule', '').lower() != 'n/a' and course_data.get('recitation_schedule', ''):
+                    schedule_str = course_data.get('recitation_schedule', '')
+                    if schedule_str:
+                        days = parse_days_string(schedule_str)
+                        times = parse_time_string(schedule_str)
+                        if days and times:
+                            class_schedule.append({
+                                'days': days,
+                                'start_time': times[0],
+                                'end_time': times[1],
+                                'type': 'Recitation',
+                                'location': course_data.get('recitation_location', '')
                             })
                 
                 course_data['class_schedule'] = class_schedule
@@ -1209,31 +1224,33 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         for course_code in course_study_requirements:
             study_slots_assigned[course_code] = 0
         
-        # First pass: assign required sessions for each course
+        # Get available study time slots
         available_times = []
         for study_time in base_study_times:
             if study_time in daily_schedule and daily_schedule[study_time]["type"] == "free":
                 available_times.append(study_time)
         
-        # Distribute study sessions fairly
-        time_index = 0
-        while time_index < len(available_times) and any(study_slots_assigned[code] < course_study_requirements[code] for code in course_study_requirements):
-            study_time = available_times[time_index]
-            
-            # Find a course that still needs study sessions
-            for course_code, sessions_needed in course_study_requirements.items():
-                if study_slots_assigned[course_code] < sessions_needed and daily_schedule[study_time]["type"] == "free":
-                    daily_schedule[study_time] = {
-                        "activity": f"{course_code} - Study Time",
-                        "type": "study",
-                        "date": current_day_date,
-                        "course_code": course_code  # Add course code for color mapping
-                    }
-                    study_slots_assigned[course_code] += 1
-                    print(f"Assigned {course_code} study session to {study_time}")
-                    break
-            
-            time_index += 1
+        # Distribute study sessions fairly using round-robin approach
+        max_sessions_per_course = max(course_study_requirements.values()) if course_study_requirements else 0
+        
+        for session_round in range(max_sessions_per_course):
+            for course_code in course_study_requirements:
+                if (study_slots_assigned[course_code] < course_study_requirements[course_code] and 
+                    len(available_times) > 0):
+                    
+                    # Find next available time slot
+                    for study_time in available_times[:]:  # Create a copy to modify
+                        if daily_schedule[study_time]["type"] == "free":
+                            daily_schedule[study_time] = {
+                                "activity": f"{course_code} - Study Time",
+                                "type": "study",
+                                "date": current_day_date,
+                                "course_code": course_code
+                            }
+                            study_slots_assigned[course_code] += 1
+                            available_times.remove(study_time)
+                            print(f"Assigned {course_code} study session {study_slots_assigned[course_code]} to {study_time}")
+                            break
         
         # STEP 6: Add breaks (only in free slots)
         break_times = ["10:30 AM", "3:30 PM"]
@@ -1279,78 +1296,15 @@ def create_schedule_dataframe(weekly_schedule):
     return df
 
 def style_schedule_dataframe(df, weekly_schedule):
-    """Apply color coding to the schedule dataframe with course-specific colors"""
-    
-    # Define base colors for courses (classes)
-    course_colors = {
-        'class': ['#3742fa', '#2f3542', '#ff6348', '#2ed573', '#ffa502', '#a4b0be', '#ff4757', '#5352ed'],
-        'study': ['#74b9ff', '#57606f', '#ff9f43', '#55efc4', '#ffc048', '#d1d8e0', '#ff7675', '#6c5ce7']
-    }
-    
-    # Create course code to color mapping
-    courses_found = set()
-    for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
-        for time_slot in weekly_schedule.get(day, {}):
-            slot_data = weekly_schedule[day][time_slot]
-            if slot_data["type"] in ["class", "study"]:
-                activity = slot_data["activity"]
-                # Extract course code (first part before " - ")
-                if " - " in activity:
-                    course_code = activity.split(" - ")[0]
-                    courses_found.add(course_code)
-    
-    courses_list = sorted(list(courses_found))
-    course_color_map = {}
-    for i, course_code in enumerate(courses_list):
-        color_index = i % len(course_colors['class'])
-        course_color_map[course_code] = {
-            'class': course_colors['class'][color_index],
-            'study': course_colors['study'][color_index]
-        }
+    """Apply light teal background with dark text for better readability"""
     
     def color_cell(val):
         # Handle blank cells
         if val == "":
             return "background-color: transparent; color: transparent;"
         
-        # Get the type from the weekly schedule
-        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
-            for time_slot in weekly_schedule.get(day, {}):
-                slot_data = weekly_schedule[day][time_slot]
-                if slot_data["activity"] == val:
-                    activity_type = slot_data["type"]
-                    
-                    if activity_type == "blank":
-                        return "background-color: transparent; color: transparent;"
-                    elif activity_type == "class":
-                        # Get course code for color mapping
-                        course_code = val.split(" - ")[0] if " - " in val else "DEFAULT"
-                        if course_code in course_color_map:
-                            color = course_color_map[course_code]['class']
-                        else:
-                            color = "#3742fa"  # default class color
-                        return f"background-color: {color}; color: white; font-weight: bold;"
-                    elif activity_type == "study":
-                        # Get course code for color mapping
-                        course_code = val.split(" - ")[0] if " - " in val else "DEFAULT"
-                        if course_code in course_color_map:
-                            color = course_color_map[course_code]['study']
-                        else:
-                            color = "#5f27cd"  # default study color
-                        return f"background-color: {color}; color: white; font-weight: bold;"
-                    elif activity_type == "meal":
-                        return "background-color: #ff9f43; color: white; font-weight: bold;"
-                    elif activity_type == "activity":
-                        return "background-color: #e67e22; color: white; font-weight: bold;"
-                    elif activity_type == "sleep":
-                        return "background-color: #2f3542; color: white; font-weight: bold;"
-                    elif activity_type == "sleep_prep":
-                        return "background-color: #5a6c7d; color: white; font-weight: bold;"
-                    elif activity_type == "break":
-                        return "background-color: #ff6b6b; color: white; font-weight: bold;"
-                    elif activity_type == "free":
-                        return "background-color: #00d2d3; color: white; font-weight: bold;"
-        return "background-color: #00d2d3; color: white; font-weight: bold;"  # Default to free time
+        # Default light teal background with dark text for all cells
+        return "background-color: #b2f5ea; color: #2d3748; font-weight: 600; padding: 8px; border: 1px solid #81e6d9;"
     
     return df.style.applymap(color_cell, subset=df.columns[1:])
 
@@ -1440,8 +1394,12 @@ def generate_pdf_schedule(schedule_data, user_data):
                         cell_content += "..."
                 
                 # Wrap in Paragraph for proper text handling
-                cell_paragraph = Paragraph(cell_content, ParagraphStyle('CellText', fontSize=6, leading=8))
-                data_row.append(cell_paragraph)
+                try:
+                    cell_paragraph = Paragraph(cell_content, ParagraphStyle('CellText', fontSize=6, leading=8))
+                    data_row.append(cell_paragraph)
+                except:
+                    # Fallback to plain text if Paragraph fails
+                    data_row.append(str(cell_content))
             table_data.append(data_row)
     
     # Create table with better column widths for landscape and text wrapping
@@ -2149,10 +2107,11 @@ def show_schedule_step():
     with col4:
         st.metric("Weekend Study", "6 sessions")
     
-    # Compact legend in one line
+    # Compact legend updated for new color scheme
     st.markdown("""
     <div style="text-align: center; margin: 0.5rem 0; font-size: 0.8rem;">
-        🔵 Classes | 🟣 Study | 🟠 Meals | 🟤 Activities | ⚫ Sleep | 🔴 Breaks | 🟢 Free Time | 🌙 Go to Sleep
+        <span style="background: #b2f5ea; color: #2d3748; padding: 4px 8px; border-radius: 4px; margin: 2px;">All Activities</span> - 
+        Easy to read light teal background for all schedule items
     </div>
     """, unsafe_allow_html=True)
     
