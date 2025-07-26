@@ -1373,7 +1373,8 @@ def generate_pdf_schedule(schedule_data, user_data):
         if row['Time'] in key_times:
             data_row = [row['Time']]
             for col in df.columns[1:]:
-                cell_content = str(row[col])
+                cell_content = str(row[col])  # Ensure it's a string
+                
                 # Truncate long text and add line breaks for better fitting
                 if len(cell_content) > 20:
                     # Break long text into multiple lines
@@ -1393,13 +1394,8 @@ def generate_pdf_schedule(schedule_data, user_data):
                     if len(lines) > 2:
                         cell_content += "..."
                 
-                # Wrap in Paragraph for proper text handling
-                try:
-                    cell_paragraph = Paragraph(cell_content, ParagraphStyle('CellText', fontSize=6, leading=8))
-                    data_row.append(cell_paragraph)
-                except:
-                    # Fallback to plain text if Paragraph fails
-                    data_row.append(str(cell_content))
+                # Add to row as plain string - no Paragraph objects for now
+                data_row.append(cell_content)
             table_data.append(data_row)
     
     # Create table with better column widths for landscape and text wrapping
@@ -1423,28 +1419,32 @@ def generate_pdf_schedule(schedule_data, user_data):
     for row_idx, row_data in enumerate(table_data[1:], 1):  # Skip header row
         for col_idx, cell_content in enumerate(row_data[1:], 1):  # Skip time column
             if cell_content:
+                cell_str = str(cell_content)  # Ensure it's a string for comparison
+                
                 # Determine color based on activity type
-                if 'Sleep' in cell_content and 'Go to' not in cell_content:
+                if 'Sleep' in cell_str and 'Go to' not in cell_str:
                     bg_color = colors.HexColor('#2f3542')
-                elif 'Go to Sleep' in cell_content:
+                elif 'Go to Sleep' in cell_str:
                     bg_color = colors.HexColor('#5a6c7d')
-                elif 'Lecture' in cell_content or 'Lab' in cell_content:
+                elif 'Lecture' in cell_str or 'Lab' in cell_str or 'Recitation' in cell_str:
                     bg_color = colors.HexColor('#3742fa')
-                elif 'Study Time' in cell_content:
+                elif 'Study Time' in cell_str:
                     # Different colors for different courses
-                    if 'MICROA' in cell_content or 'MICRO' in cell_content:
+                    if 'MICROA' in cell_str or 'MICRO' in cell_str or 'MICR' in cell_str:
                         bg_color = colors.HexColor('#8e44ad')  # Purple
-                    elif 'A&PI' in cell_content or 'A&P' in cell_content:
+                    elif 'A&PI' in cell_str or 'A&P' in cell_str:
                         bg_color = colors.HexColor('#9b59b6')  # Light Purple
+                    elif 'TEST' in cell_str:
+                        bg_color = colors.HexColor('#e74c3c')  # Red for test courses
                     else:
                         bg_color = colors.HexColor('#5f27cd')  # Default study purple
-                elif 'Breakfast' in cell_content or 'Lunch' in cell_content or 'Dinner' in cell_content:
+                elif 'Breakfast' in cell_str or 'Lunch' in cell_str or 'Dinner' in cell_str:
                     bg_color = colors.HexColor('#ff9f43')
-                elif 'Break' in cell_content:
+                elif 'Break' in cell_str:
                     bg_color = colors.HexColor('#ff6b6b')
-                elif 'Practice' in cell_content or 'Game' in cell_content or 'Workout' in cell_content:
+                elif 'Practice' in cell_str or 'Game' in cell_str or 'Workout' in cell_str:
                     bg_color = colors.HexColor('#e67e22')
-                elif 'Free Time' in cell_content:
+                elif 'Free Time' in cell_str:
                     bg_color = colors.HexColor('#00d2d3')
                 else:
                     bg_color = colors.white
