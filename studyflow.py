@@ -50,7 +50,7 @@ st.markdown("""
         text-align: center;
         font-size: 2rem;
         font-weight: 700;
-        color: #6c5ce7;
+        color: #00d2d3;
         margin-bottom: 1rem;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
@@ -69,7 +69,7 @@ st.markdown("""
         display: inline-block;
         width: 35px;
         height: 35px;
-        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+        background: linear-gradient(135deg, #00d2d3, #48bb78);
         color: white;
         border-radius: 50%;
         text-align: center;
@@ -91,7 +91,7 @@ st.markdown("""
     .course-code {
         font-size: 1.1rem;
         font-weight: 600;
-        color: #6c5ce7;
+        color: #00d2d3;
         margin-bottom: 0.5rem;
     }
     
@@ -102,11 +102,11 @@ st.markdown("""
     }
     
     .class-schedule {
-        background: rgba(108, 92, 231, 0.1);
+        background: rgba(0, 210, 211, 0.1);
         border-radius: 8px;
         padding: 0.75rem;
         margin: 0.5rem 0;
-        border-left: 3px solid #6c5ce7;
+        border-left: 3px solid #00d2d3;
     }
     
     .class-schedule-item {
@@ -179,7 +179,7 @@ st.markdown("""
     .stat-number {
         font-size: 2rem;
         font-weight: 700;
-        color: #6c5ce7;
+        color: #00d2d3;
         display: block;
     }
     
@@ -199,7 +199,7 @@ st.markdown("""
     
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+        background: linear-gradient(90deg, #00d2d3, #48bb78);
         transition: width 0.3s ease;
     }
     
@@ -246,7 +246,7 @@ st.markdown("""
     .week-title {
         font-size: 1.1rem;
         font-weight: 600;
-        color: #6c5ce7;
+        color: #00d2d3;
         min-width: 150px;
         text-align: center;
     }
@@ -264,7 +264,7 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.9) !important;
         color: #2d3748 !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
-        border: 2px solid rgba(108, 92, 231, 0.3) !important;
+        border: 2px solid rgba(0, 210, 211, 0.3) !important;
     }
     
     .stButton > button:hover {
@@ -272,7 +272,7 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
         background: rgba(255, 255, 255, 1) !important;
         color: #2d3748 !important;
-        border: 2px solid #6c5ce7 !important;
+        border: 2px solid #00d2d3 !important;
     }
     
     .stDownloadButton > button {
@@ -434,7 +434,7 @@ def parse_time_string(time_str):
     return None
 
 def parse_days_string(schedule_str):
-    """Parse days from string like 'M,W,F 10:40-11:30am'"""
+    """Parse days from string like 'M,W,F 10:40-11:30am' or 'T,R 2:00-3:30pm'"""
     if not schedule_str or str(schedule_str).lower() == 'n/a':
         return []
     
@@ -442,16 +442,24 @@ def parse_days_string(schedule_str):
         'M': 'Monday',
         'T': 'Tuesday', 
         'W': 'Wednesday',
-        'R': 'Thursday',
+        'R': 'Thursday',  # R = Thursday
         'F': 'Friday',
         'S': 'Saturday',
         'U': 'Sunday'
     }
     
     days = []
-    for abbr, full_name in days_map.items():
-        if abbr in schedule_str.upper():
-            days.append(full_name)
+    # Get just the days part (before the time)
+    days_part = schedule_str.split()[0] if ' ' in schedule_str else schedule_str
+    
+    # Split by comma and process each day
+    day_letters = days_part.replace(',', '').replace(' ', '')
+    
+    for letter in day_letters:
+        if letter.upper() in days_map:
+            full_day = days_map[letter.upper()]
+            if full_day not in days:  # Avoid duplicates
+                days.append(full_day)
     
     return days
 
@@ -652,14 +660,36 @@ def parse_excel_course_file(file):
                 
                 # Generate course code from name
                 if 'name' in course_data:
-                    # Simple code generation to save memory
+                    # Improved code generation - use first letters, not last
                     name_upper = course_data['name'].upper()
+                    
+                    # Try to extract standard course format first (e.g., "BIO 3455", "CHEM 101")
                     code_match = re.search(r'([A-Z]{2,4})\s*(\d{3,4})', name_upper)
                     if code_match:
                         course_data['code'] = f"{code_match.group(1)}{code_match.group(2)}"
                     else:
-                        # Simple fallback
-                        course_data['code'] = name_upper.replace(' ', '')[:6]
+                        # Fallback: use first letters of significant words
+                        # Remove common words and split into words
+                        words = re.findall(r'[A-Z][A-Z]*', name_upper.replace('INTRODUCTION TO', '').replace('GENERAL', '').replace('BASIC', ''))
+                        
+                        if words:
+                            # Take first 3-4 letters from the first significant word
+                            first_word = words[0]
+                            if len(first_word) >= 4:
+                                code_prefix = first_word[:4]  # First 4 letters
+                            else:
+                                code_prefix = first_word[:3]  # First 3 letters if word is short
+                            
+                            # Look for numbers in the name
+                            number_match = re.search(r'(\d{3,4})', name_upper)
+                            if number_match:
+                                course_data['code'] = f"{code_prefix}{number_match.group(1)}"
+                            else:
+                                course_data['code'] = code_prefix
+                        else:
+                            # Ultimate fallback - first 4 characters of cleaned name
+                            cleaned_name = re.sub(r'[^A-Z0-9]', '', name_upper)
+                            course_data['code'] = cleaned_name[:4] if len(cleaned_name) >= 4 else cleaned_name
                 
                 # Parse class schedules (simplified)
                 class_schedule = []
@@ -818,8 +848,16 @@ def generate_weekly_schedule(courses, intramurals, preferences):
     time_slots = generate_time_slots()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
-    # Use current date for display purposes
-    start_date = datetime.now().date()
+    # Use the selected start date from preferences
+    start_date = preferences.get('start_date', datetime.now().date())
+    schedule_type = preferences.get('schedule_type', '📅 Current Week (this week)')
+    
+    # For template schedule, use generic dates
+    if schedule_type == "📊 Template Week (reusable)":
+        # Use a generic Monday as start date for template
+        today = datetime.now().date()
+        days_since_monday = today.weekday()
+        start_date = today - timedelta(days=days_since_monday)
     
     # Generate just one week template
     weekly_schedule = {}
@@ -1177,7 +1215,7 @@ def generate_pdf_schedule(schedule_data, user_data):
         fontSize=16,
         spaceAfter=8,
         alignment=TA_CENTER,
-        textColor=colors.HexColor('#6c5ce7')
+        textColor=colors.HexColor('#00d2d3')
     )
     
     wellness_style = ParagraphStyle(
@@ -1223,28 +1261,51 @@ def generate_pdf_schedule(schedule_data, user_data):
         header_row.append(day_name)
     table_data.append(header_row)
     
-    # Add data rows
+    # Add data rows with text wrapping
     for _, row in df.iterrows():
         if row['Time'] in key_times:
             data_row = [row['Time']]
             for col in df.columns[1:]:
-                data_row.append(row[col])
+                cell_content = str(row[col])
+                # Truncate long text and add line breaks for better fitting
+                if len(cell_content) > 20:
+                    # Break long text into multiple lines
+                    words = cell_content.split(' ')
+                    lines = []
+                    current_line = ""
+                    for word in words:
+                        if len(current_line + " " + word) <= 15:
+                            current_line += (" " + word) if current_line else word
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = word
+                    if current_line:
+                        lines.append(current_line)
+                    cell_content = "<br/>".join(lines[:2])  # Max 2 lines
+                    if len(lines) > 2:
+                        cell_content += "..."
+                
+                # Wrap in Paragraph for proper text handling
+                cell_paragraph = Paragraph(cell_content, ParagraphStyle('CellText', fontSize=6, leading=8))
+                data_row.append(cell_paragraph)
             table_data.append(data_row)
     
-    # Create table with better column widths for landscape
+    # Create table with better column widths for landscape and text wrapping
     table = Table(table_data, colWidths=[0.8*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch])
     
     # Apply colors to the table
     table_style = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#00d2d3')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('FONTSIZE', (0, 1), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
     ]
     
     # Apply cell-specific colors based on content
@@ -1699,7 +1760,7 @@ def show_preferences_step():
     """Step 2: Preferences setup"""
     st.markdown("""
     <div style="background: rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1rem; margin: 1rem 0; text-align: center;">
-        <h2 style="color: #6c5ce7; margin-bottom: 0.5rem;">⚙️ Step 2: Your Preferences</h2>
+        <h2 style="color: #00d2d3; margin-bottom: 0.5rem;">⚙️ Step 2: Your Preferences</h2>
         <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 0;">Set your schedule preferences</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1720,6 +1781,26 @@ def show_preferences_step():
             bedtime_actual = bedtime_hour + 24  # 25, 26 for 1AM, 2AM
         
         st.write(f"**Bedtime: {bedtime_display}**")
+        
+        st.markdown("### 📅 Schedule Timeline")
+        schedule_type = st.selectbox(
+            "What type of schedule do you want?",
+            ["📅 Current Week (this week)", "📊 Template Week (reusable)", "🗓️ Custom Start Date"]
+        )
+        
+        start_date = datetime.now().date()
+        if schedule_type == "🗓️ Custom Start Date":
+            start_date = st.date_input(
+                "Choose start date for your schedule:",
+                value=datetime.now().date(),
+                help="Pick the Monday you want your schedule to start"
+            )
+            # Adjust to Monday if not already
+            days_since_monday = start_date.weekday()
+            start_date = start_date - timedelta(days=days_since_monday)
+            st.info(f"Schedule will start on Monday: {start_date.strftime('%B %d, %Y')}")
+        elif schedule_type == "📊 Template Week (reusable)":
+            st.info("Creates a generic weekly template without specific dates")
         
         st.markdown("### 📚 Study Preferences")
         study_intensity = st.selectbox(
@@ -1858,7 +1939,9 @@ def show_preferences_step():
         'wake_time': wake_time,
         'bedtime': bedtime_actual,
         'study_intensity': study_intensity,
-        'include_intramurals': include_intramurals
+        'include_intramurals': include_intramurals,
+        'schedule_type': schedule_type,
+        'start_date': start_date
     }
     
     st.session_state.user_data = preferences
