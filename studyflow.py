@@ -1368,33 +1368,31 @@ def generate_pdf_schedule(schedule_data, user_data):
         header_row.append(day_name)
     table_data.append(header_row)
     
-    # Add data rows with text wrapping
+    # Add data rows with proper text handling
     for _, row in df.iterrows():
         if row['Time'] in key_times:
             data_row = [row['Time']]
             for col in df.columns[1:]:
-                cell_content = str(row[col])  # Ensure it's a string
+                cell_content = str(row[col])
                 
-                # Truncate long text and add line breaks for better fitting
-                if len(cell_content) > 20:
-                    # Break long text into multiple lines
+                # Clean up the text - remove any HTML tags and normalize
+                cell_content = cell_content.replace('<br/>', ' ')
+                cell_content = cell_content.replace('<br>', ' ')
+                cell_content = cell_content.replace('&nbsp;', ' ')
+                cell_content = re.sub(r'<[^>]+>', '', cell_content)  # Remove any HTML tags
+                
+                # Truncate very long text but keep it readable
+                if len(cell_content) > 25:
+                    # Find a good break point
                     words = cell_content.split(' ')
-                    lines = []
-                    current_line = ""
-                    for word in words:
-                        if len(current_line + " " + word) <= 15:
-                            current_line += (" " + word) if current_line else word
-                        else:
-                            if current_line:
-                                lines.append(current_line)
-                            current_line = word
-                    if current_line:
-                        lines.append(current_line)
-                    cell_content = "<br/>".join(lines[:2])  # Max 2 lines
-                    if len(lines) > 2:
-                        cell_content += "..."
+                    if len(words) > 3:
+                        # Take first 3 words and add "..."
+                        cell_content = ' '.join(words[:3]) + '...'
+                    else:
+                        # Just truncate at 25 characters
+                        cell_content = cell_content[:22] + '...'
                 
-                # Add to row as plain string - no Paragraph objects for now
+                # Add to row as plain string
                 data_row.append(cell_content)
             table_data.append(data_row)
     
