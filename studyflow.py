@@ -31,7 +31,7 @@ st.markdown("""
     
     .stApp {
         font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+        background: linear-gradient(135deg, #319795 0%, #38b2ac 50%, #2c7a7b 100%);
         min-height: 100vh;
         color: #ffffff;
     }
@@ -2107,11 +2107,10 @@ def show_schedule_step():
     with col4:
         st.metric("Weekend Study", "6 sessions")
     
-    # Compact legend updated for new color scheme
+    # Updated legend for color-coded schedule
     st.markdown("""
     <div style="text-align: center; margin: 0.5rem 0; font-size: 0.8rem;">
-        <span style="background: #b2f5ea; color: #2d3748; padding: 4px 8px; border-radius: 4px; margin: 2px;">All Activities</span> - 
-        Easy to read light teal background for all schedule items
+        🔵 Classes | 🟣 Study (color-matched to classes) | 🟠 Meals | 🟤 Activities | ⚫ Sleep | 🔴 Breaks | 🟢 Free Time | 🌙 Go to Sleep
     </div>
     """, unsafe_allow_html=True)
     
