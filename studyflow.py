@@ -1127,8 +1127,8 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                     if hour >= bedtime or hour < wake_time:
                         should_be_sleep = True
                 elif bedtime <= 2:  # Bedtime is early morning (1 AM, 2 AM)
-                    bedtime_24 = bedtime + 24  # Convert to 24+ for comparison
-                    if hour >= 22 or hour <= bedtime or hour < wake_time:
+                    # For early morning bedtimes like 1 AM or 2 AM
+                    if hour >= 22 or hour < wake_time:
                         should_be_sleep = True
                 
                 if should_be_sleep:
@@ -1136,40 +1136,58 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         
         # Add "Go to Sleep" slot 30 minutes before bedtime (only if it's currently free)
         go_to_sleep_time = None
-        if bedtime >= 22:  # If bedtime is 10 PM (22) or later
-            if bedtime == 22:  # 10 PM
-                go_to_sleep_time = "9:30 PM"
-            elif bedtime == 23:  # 11 PM
-                go_to_sleep_time = "10:30 PM"
-        elif bedtime == 1:  # 1 AM (stored as 25)
-            go_to_sleep_time = "12:30 AM"
-        elif bedtime == 2:  # 2 AM (stored as 26)
-            go_to_sleep_time = "1:30 AM"
+        if bedtime == 22:  # 10 PM
+            go_to_sleep_time = "9:30 PM"
+        elif bedtime == 23:  # 11 PM
+            go_to_sleep_time = "10:30 PM"
+        elif bedtime >= 24:  # 1 AM (stored as 25) or 2 AM (stored as 26)
+            if bedtime == 25:  # 1 AM
+                go_to_sleep_time = "12:30 AM"
+            elif bedtime == 26:  # 2 AM
+                go_to_sleep_time = "1:30 AM"
         
         if go_to_sleep_time and go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
         
-        # STEP 4: Add meals (only in free slots, but try to be flexible)
-        meal_times = {
-            "8:00 AM": "Breakfast",
-            "12:00 PM": "Lunch", 
-            "6:00 PM": "Dinner"
+        # STEP 4: Add meals with flexible timing (higher priority than study, lower than classes)
+        meal_times = [
+            ("8:00 AM", "Breakfast"),
+            ("12:00 PM", "Lunch"), 
+            ("6:00 PM", "Dinner")
+        ]
+        
+        # Alternative meal times if primary times are blocked
+        alt_meal_times = {
+            "Breakfast": ["7:30 AM", "8:30 AM", "9:00 AM", "7:00 AM"],
+            "Lunch": ["11:30 AM", "12:30 PM", "1:00 PM", "1:30 PM", "11:00 AM"],
+            "Dinner": ["5:30 PM", "6:30 PM", "7:00 PM", "5:00 PM", "7:30 PM"]
         }
         
-        # Try primary meal times first
-        for meal_time, meal_name in meal_times.items():
+        for meal_time, meal_name in meal_times:
+            meal_scheduled = False
+            
+            # Try primary meal time first
             if meal_time in daily_schedule and daily_schedule[meal_time]["type"] == "free":
                 daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
-        
-        # If dinner was blocked by activities, try to find alternative dinner time
-        dinner_scheduled = any(slot["activity"] == "Dinner" for slot in daily_schedule.values())
-        if not dinner_scheduled:
-            # Try alternative dinner times
-            alt_dinner_times = ["5:30 PM", "6:30 PM", "7:00 PM", "7:30 PM"]
-            for alt_time in alt_dinner_times:
-                if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "free":
-                    daily_schedule[alt_time] = {"activity": "Dinner", "type": "meal", "date": current_day_date}
-                    break
+                meal_scheduled = True
+            
+            # If primary time blocked, try alternatives
+            if not meal_scheduled:
+                for alt_time in alt_meal_times[meal_name]:
+                    if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "free":
+                        daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+                        meal_scheduled = True
+                        print(f"Moved {meal_name} from {meal_time} to {alt_time} due to conflict")
+                        break
+            
+            # Last resort: override study time if no free slots (meals > study priority)
+            if not meal_scheduled:
+                for alt_time in alt_meal_times[meal_name]:
+                    if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "study":
+                        print(f"Override study time at {alt_time} for {meal_name}")
+                        daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+                        meal_scheduled = True
+                        break
         
         # STEP 5: Add study sessions based on course requirements (only in free slots)
         course_study_requirements = {}
