@@ -453,13 +453,6 @@ def parse_time_string(time_str):
     time_part = re.sub(r'\s+', ' ', time_part.strip().lower())
     
     # Try to find any time range pattern with maximum flexibility
-    # This mega-regex handles almost any reasonable time format:
-    # - With/without minutes (10am, 10:30am)
-    # - With/without spaces around dash (10am-12pm, 10am - 12pm, 10am- 12pm)
-    # - Mixed am/pm (10am-2pm, 10:30am-11:45pm)
-    # - With/without am/pm on first time (10-11am, 10am-11am)
-    # - Various separators (-, to, until)
-    
     time_pattern = r'''
         (\d{1,2})                    # Start hour (1-12)
         (?::(\d{2}))?                # Optional start minutes (:30)
@@ -1107,6 +1100,8 @@ def generate_weekly_schedule(courses, intramurals, preferences):
         wake_time = preferences.get('wake_time', 8)
         bedtime = preferences.get('bedtime', 23)  # Using 24-hour format now
         
+        print(f"Debug sleep: wake_time={wake_time}, bedtime={bedtime}")
+        
         # Fill sleep times - continuous sleep from bedtime to wake time
         for time_slot in time_slots:
             if daily_schedule[time_slot]["type"] == "free":  # Only if free
@@ -1122,32 +1117,40 @@ def generate_weekly_schedule(courses, intramurals, preferences):
                 # Determine if this hour should be sleep
                 should_be_sleep = False
                 
-                if bedtime >= 22:  # Bedtime is 10 PM or later (22, 23)
+                # Handle different bedtime scenarios properly
+                if bedtime <= 23:  # Normal evening bedtimes (9 PM = 21, 10 PM = 22, 11 PM = 23)
                     # Sleep from bedtime until wake_time next day
                     if hour >= bedtime or hour < wake_time:
                         should_be_sleep = True
-                elif bedtime <= 2:  # Bedtime is early morning (1 AM, 2 AM)
-                    # For early morning bedtimes like 1 AM or 2 AM
-                    if hour >= 22 or hour < wake_time:
+                        print(f"Sleep slot (normal bedtime): {time_slot} (hour={hour})")
+                elif bedtime >= 24:  # Early morning bedtimes (1 AM = 25, 2 AM = 26)
+                    actual_bedtime = bedtime - 24  # Convert back to 0-based hours
+                    # Sleep from 10 PM until bedtime, then from bedtime until wake_time
+                    if hour >= 22 or hour <= actual_bedtime or hour < wake_time:
                         should_be_sleep = True
+                        print(f"Sleep slot (late bedtime): {time_slot} (hour={hour}, actual_bedtime={actual_bedtime})")
                 
                 if should_be_sleep:
                     daily_schedule[time_slot] = {"activity": "Sleep", "type": "sleep", "date": current_day_date}
         
         # Add "Go to Sleep" slot 30 minutes before bedtime (only if it's currently free)
         go_to_sleep_time = None
-        if bedtime == 22:  # 10 PM
+        if bedtime == 21:  # 9 PM
+            go_to_sleep_time = "8:30 PM"
+        elif bedtime == 22:  # 10 PM
             go_to_sleep_time = "9:30 PM"
         elif bedtime == 23:  # 11 PM
             go_to_sleep_time = "10:30 PM"
-        elif bedtime >= 24:  # 1 AM (stored as 25) or 2 AM (stored as 26)
-            if bedtime == 25:  # 1 AM
-                go_to_sleep_time = "12:30 AM"
-            elif bedtime == 26:  # 2 AM
-                go_to_sleep_time = "1:30 AM"
+        elif bedtime == 25:  # 1 AM (stored as 25)
+            go_to_sleep_time = "12:30 AM"
+        elif bedtime == 26:  # 2 AM (stored as 26)
+            go_to_sleep_time = "1:30 AM"
+        
+        print(f"Go to sleep time: {go_to_sleep_time}")
         
         if go_to_sleep_time and go_to_sleep_time in daily_schedule and daily_schedule[go_to_sleep_time]["type"] == "free":
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
+            print(f"Added 'Go to Sleep' at {go_to_sleep_time}")
         
         # STEP 4: Add meals with flexible timing (higher priority than study, lower than classes)
         meal_times = [
@@ -1314,17 +1317,70 @@ def create_schedule_dataframe(weekly_schedule):
     return df
 
 def style_schedule_dataframe(df, weekly_schedule):
-    """Apply light teal background with dark text for better readability"""
+    """Apply color coding based on activity type"""
     
-    def color_cell(val):
+    def color_cell(val, row_idx, col_idx):
         # Handle blank cells
-        if val == "":
+        if val == "" or pd.isna(val):
             return "background-color: transparent; color: transparent;"
         
-        # Default light teal background with dark text for all cells
-        return "background-color: #b2f5ea; color: #2d3748; font-weight: 600; padding: 8px; border: 1px solid #81e6d9;"
+        # Get the day name from column header (remove date if present)
+        if col_idx < len(df.columns):
+            day_col = df.columns[col_idx]
+            day_name = day_col.split('\n')[0] if '\n' in day_col else day_col
+            
+            # Get the time slot from the row
+            time_slot = df.iloc[row_idx, 0]  # First column is time
+            
+            # Get the activity type from the weekly schedule
+            if day_name in weekly_schedule and time_slot in weekly_schedule[day_name]:
+                activity_type = weekly_schedule[day_name][time_slot].get('type', 'free')
+            else:
+                activity_type = 'free'
+        else:
+            activity_type = 'free'
+        
+        # Color mapping based on activity type
+        val_str = str(val)
+        
+        if activity_type == 'sleep' or 'Sleep' in val_str:
+            return "background-color: #2f3542; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #57606f;"
+        elif activity_type == 'sleep_prep' or 'Go to Sleep' in val_str:
+            return "background-color: #57606f; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #2f3542;"
+        elif activity_type == 'class' or any(word in val_str for word in ['Lecture', 'Lab', 'Recitation']):
+            return "background-color: #3742fa; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #2f32d2;"
+        elif activity_type == 'study' or 'Study Time' in val_str:
+            # Different colors for different courses
+            if 'MICROA' in val_str or 'MICRO' in val_str or 'MICR' in val_str:
+                return "background-color: #8e44ad; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #732d91;"
+            elif 'A&PI' in val_str or 'A&P' in val_str:
+                return "background-color: #9b59b6; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #8e44ad;"
+            elif 'TEST' in val_str:
+                return "background-color: #e74c3c; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #c0392b;"
+            else:
+                return "background-color: #5f27cd; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #341f97;"
+        elif activity_type == 'meal' or any(meal in val_str for meal in ['Breakfast', 'Lunch', 'Dinner']):
+            return "background-color: #ff9f43; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #ff7675;"
+        elif activity_type == 'break' or 'Break' in val_str:
+            return "background-color: #ff6b6b; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #fd79a8;"
+        elif activity_type == 'activity' or any(word in val_str for word in ['Practice', 'Game', 'Workout']):
+            return "background-color: #e67e22; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #d35400;"
+        elif activity_type == 'free' or 'Free Time' in val_str:
+            return "background-color: #00d2d3; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #00b894;"
+        else:
+            # Default styling
+            return "background-color: #b2f5ea; color: #2d3748; font-weight: 600; padding: 8px; border: 1px solid #81e6d9;"
     
-    return df.style.applymap(color_cell, subset=df.columns[1:])
+    # Apply styling to each cell individually
+    styled = df.style
+    for row_idx in range(len(df)):
+        for col_idx in range(1, len(df.columns)):  # Skip time column
+            styled = styled.applymap(
+                lambda val: color_cell(val, row_idx, col_idx),
+                subset=pd.IndexSlice[row_idx:row_idx, df.columns[col_idx]]
+            )
+    
+    return styled
 
 def generate_pdf_schedule(schedule_data, user_data):
     """Generate a PDF schedule in landscape with colors and better formatting"""
@@ -1777,16 +1833,6 @@ def show_excel_upload():
                 st.session_state.editing_course = None
                 st.rerun()
     
-    # File upload section (only show if not editing and haven't processed a file yet)
-    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
-        # This section is now moved to the top of the function
-        pass
-    
-    # Show manual course addition option when no file has been processed
-    if st.session_state.get('editing_course') is None and not st.session_state.get('file_processed', False):
-        # This section is now moved to the top of the function  
-        pass
-    
     # Show action buttons when courses are loaded
     if st.session_state.courses and st.session_state.get('editing_course') is None:
         st.markdown("### 🎯 Ready to Continue?")
@@ -1898,16 +1944,27 @@ def show_preferences_step():
         st.markdown("### ⏰ Time Preferences")
         wake_time = st.slider("Wake up time", 6, 11, 8, format="%d:00 AM")
         
-        # Bedtime with AM/PM display
-        bedtime_hour = st.slider("Bedtime hour", 9, 2, 11)
-        if bedtime_hour >= 9:
+        # Bedtime with AM/PM display - fixed logic
+        bedtime_hour = st.slider("Bedtime hour", 9, 2, 11, 
+                                help="9=9PM, 10=10PM, 11=11PM, 12=12AM, 1=1AM, 2=2AM")
+        
+        if bedtime_hour >= 9 and bedtime_hour <= 11:
             bedtime_display = f"{bedtime_hour}:00 PM"
-            bedtime_actual = bedtime_hour  # 21, 22, 23 for 9PM, 10PM, 11PM
-        else:
+            bedtime_actual = bedtime_hour + 12  # Convert to 24-hour: 21, 22, 23
+        elif bedtime_hour == 12:
+            bedtime_display = "12:00 AM (Midnight)"
+            bedtime_actual = 24  # Store as 24 for midnight
+        elif bedtime_hour <= 2:
             bedtime_display = f"{bedtime_hour}:00 AM"
-            bedtime_actual = bedtime_hour + 24  # 25, 26 for 1AM, 2AM
+            bedtime_actual = bedtime_hour + 24  # Store as 25, 26 for 1AM, 2AM
+        else:
+            bedtime_display = f"{bedtime_hour}:00 PM"  # fallback
+            bedtime_actual = bedtime_hour + 12
         
         st.write(f"**Bedtime: {bedtime_display}**")
+        
+        # Debug display
+        st.caption(f"Debug: slider value={bedtime_hour}, stored value={bedtime_actual}")
         
         st.markdown("### 📅 Schedule Timeline")
         schedule_type = st.selectbox(
