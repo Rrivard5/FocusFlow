@@ -1152,18 +1152,18 @@ def generate_weekly_schedule(courses, intramurals, preferences):
             daily_schedule[go_to_sleep_time] = {"activity": "Go to Sleep", "type": "sleep_prep", "date": current_day_date}
             print(f"Added 'Go to Sleep' at {go_to_sleep_time}")
         
-        # STEP 4: Add meals with flexible timing (higher priority than study, lower than classes)
+        # STEP 4: Add meals with flexible timing - ENSURE ALL 3 MEALS EVERY DAY
         meal_times = [
             ("8:00 AM", "Breakfast"),
             ("12:00 PM", "Lunch"), 
             ("6:00 PM", "Dinner")
         ]
         
-        # Alternative meal times if primary times are blocked
+        # Alternative meal times if primary times are blocked - expanded options
         alt_meal_times = {
-            "Breakfast": ["7:30 AM", "8:30 AM", "9:00 AM", "7:00 AM"],
-            "Lunch": ["11:30 AM", "12:30 PM", "1:00 PM", "1:30 PM", "11:00 AM"],
-            "Dinner": ["5:30 PM", "6:30 PM", "7:00 PM", "5:00 PM", "7:30 PM"]
+            "Breakfast": ["7:30 AM", "8:30 AM", "9:00 AM", "7:00 AM", "9:30 AM", "6:30 AM", "10:00 AM"],
+            "Lunch": ["11:30 AM", "12:30 PM", "1:00 PM", "1:30 PM", "11:00 AM", "2:00 PM", "10:30 AM"],
+            "Dinner": ["5:30 PM", "6:30 PM", "7:00 PM", "5:00 PM", "7:30 PM", "4:30 PM", "8:00 PM"]
         }
         
         for meal_time, meal_name in meal_times:
@@ -1173,24 +1173,53 @@ def generate_weekly_schedule(courses, intramurals, preferences):
             if meal_time in daily_schedule and daily_schedule[meal_time]["type"] == "free":
                 daily_schedule[meal_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
                 meal_scheduled = True
+                print(f"✅ Scheduled {meal_name} at primary time {meal_time}")
             
-            # If primary time blocked, try alternatives
+            # If primary time blocked, try alternatives in free slots
             if not meal_scheduled:
                 for alt_time in alt_meal_times[meal_name]:
                     if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "free":
                         daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
                         meal_scheduled = True
-                        print(f"Moved {meal_name} from {meal_time} to {alt_time} due to conflict")
+                        print(f"✅ Moved {meal_name} from {meal_time} to {alt_time} (free slot)")
                         break
             
-            # Last resort: override study time if no free slots (meals > study priority)
+            # If still not scheduled, override study time (meals > study priority)
             if not meal_scheduled:
                 for alt_time in alt_meal_times[meal_name]:
                     if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "study":
-                        print(f"Override study time at {alt_time} for {meal_name}")
+                        print(f"⚠️ Override study time at {alt_time} for {meal_name}")
                         daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
                         meal_scheduled = True
                         break
+            
+            # Last resort: override break time if needed (meals are essential)
+            if not meal_scheduled:
+                for alt_time in alt_meal_times[meal_name]:
+                    if alt_time in daily_schedule and daily_schedule[alt_time]["type"] == "break":
+                        print(f"⚠️ Override break time at {alt_time} for {meal_name}")
+                        daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+                        meal_scheduled = True
+                        break
+            
+            # Emergency fallback: find ANY available slot that's not class/sleep/activity
+            if not meal_scheduled:
+                print(f"🚨 Emergency scheduling for {meal_name} on {day}")
+                for alt_time in alt_meal_times[meal_name]:
+                    if alt_time in daily_schedule:
+                        current_type = daily_schedule[alt_time]["type"]
+                        # Don't override classes, sleep, or scheduled activities
+                        if current_type not in ["class", "sleep", "sleep_prep", "activity"]:
+                            print(f"🚨 Emergency: Placed {meal_name} at {alt_time} (was {current_type})")
+                            daily_schedule[alt_time] = {"activity": meal_name, "type": "meal", "date": current_day_date}
+                            meal_scheduled = True
+                            break
+            
+            # Final check - if still not scheduled, log error
+            if not meal_scheduled:
+                print(f"❌ ERROR: Could not schedule {meal_name} on {day}!")
+            else:
+                print(f"✅ {meal_name} successfully scheduled on {day}")
         
         # STEP 5: Add study sessions based on course requirements (only in free slots)
         course_study_requirements = {}
