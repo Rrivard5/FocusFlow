@@ -1319,68 +1319,46 @@ def create_schedule_dataframe(weekly_schedule):
 def style_schedule_dataframe(df, weekly_schedule):
     """Apply color coding based on activity type"""
     
-    def color_cell(val, row_idx, col_idx):
+    def color_cells(val):
         # Handle blank cells
         if val == "" or pd.isna(val):
             return "background-color: transparent; color: transparent;"
         
-        # Get the day name from column header (remove date if present)
-        if col_idx < len(df.columns):
-            day_col = df.columns[col_idx]
-            day_name = day_col.split('\n')[0] if '\n' in day_col else day_col
-            
-            # Get the time slot from the row
-            time_slot = df.iloc[row_idx, 0]  # First column is time
-            
-            # Get the activity type from the weekly schedule
-            if day_name in weekly_schedule and time_slot in weekly_schedule[day_name]:
-                activity_type = weekly_schedule[day_name][time_slot].get('type', 'free')
-            else:
-                activity_type = 'free'
-        else:
-            activity_type = 'free'
-        
-        # Color mapping based on activity type
+        # Color mapping based on activity content
         val_str = str(val)
         
-        if activity_type == 'sleep' or 'Sleep' in val_str:
+        if 'Sleep' in val_str and 'Go to' not in val_str:
             return "background-color: #2f3542; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #57606f;"
-        elif activity_type == 'sleep_prep' or 'Go to Sleep' in val_str:
+        elif 'Go to Sleep' in val_str:
             return "background-color: #57606f; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #2f3542;"
-        elif activity_type == 'class' or any(word in val_str for word in ['Lecture', 'Lab', 'Recitation']):
+        elif any(word in val_str for word in ['Lecture', 'Lab', 'Recitation']):
             return "background-color: #3742fa; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #2f32d2;"
-        elif activity_type == 'study' or 'Study Time' in val_str:
+        elif 'Study Time' in val_str:
             # Different colors for different courses
-            if 'MICROA' in val_str or 'MICRO' in val_str or 'MICR' in val_str:
+            if 'MICR' in val_str or 'MICRO' in val_str:
                 return "background-color: #8e44ad; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #732d91;"
-            elif 'A&PI' in val_str or 'A&P' in val_str:
+            elif 'A - Study Time' in val_str or 'A&P' in val_str:
                 return "background-color: #9b59b6; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #8e44ad;"
             elif 'TEST' in val_str:
                 return "background-color: #e74c3c; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #c0392b;"
             else:
                 return "background-color: #5f27cd; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #341f97;"
-        elif activity_type == 'meal' or any(meal in val_str for meal in ['Breakfast', 'Lunch', 'Dinner']):
+        elif any(meal in val_str for meal in ['Breakfast', 'Lunch', 'Dinner']):
             return "background-color: #ff9f43; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #ff7675;"
-        elif activity_type == 'break' or 'Break' in val_str:
+        elif 'Break' in val_str:
             return "background-color: #ff6b6b; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #fd79a8;"
-        elif activity_type == 'activity' or any(word in val_str for word in ['Practice', 'Game', 'Workout']):
+        elif any(word in val_str for word in ['Practice', 'Game', 'Workout']):
             return "background-color: #e67e22; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #d35400;"
-        elif activity_type == 'free' or 'Free Time' in val_str:
+        elif 'Free Time' in val_str:
             return "background-color: #00d2d3; color: #ffffff; font-weight: 600; padding: 8px; border: 1px solid #00b894;"
         else:
-            # Default styling
+            # Default styling for anything else
             return "background-color: #b2f5ea; color: #2d3748; font-weight: 600; padding: 8px; border: 1px solid #81e6d9;"
     
-    # Apply styling to each cell individually
-    styled = df.style
-    for row_idx in range(len(df)):
-        for col_idx in range(1, len(df.columns)):  # Skip time column
-            styled = styled.applymap(
-                lambda val: color_cell(val, row_idx, col_idx),
-                subset=pd.IndexSlice[row_idx:row_idx, df.columns[col_idx]]
-            )
+    # Apply styling to all columns except the first (Time column)
+    styled_df = df.style.applymap(color_cells, subset=df.columns[1:])
     
-    return styled
+    return styled_df
 
 def generate_pdf_schedule(schedule_data, user_data):
     """Generate a PDF schedule in landscape with colors and better formatting"""
